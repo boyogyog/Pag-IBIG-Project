@@ -22,5 +22,5 @@ Before proceeding, make sure you have the following installed:
     b. MySQL Workbench
     
     Tutorial in downloading both of these:
-    - [Link]([url](https://www.youtube.com/watch?v=wgRwITQHszU&t=114s))
+    https://www.youtube.com/watch?v=wgRwITQHszU&t=114s
 
