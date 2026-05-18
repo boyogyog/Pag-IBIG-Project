@@ -1,26 +1,59 @@
-1. Pag-IBIG Database Setup Guide
-This repository contains the Pag-IBIG Membership Database based on a normalized Third Normal Form (3NF) schema. The goal is to ensure that all team members are working with the same database structure and data for development and testing.
+# Pag-CONNECT
 
+Pag-CONNECT is a web-based Pag-IBIG membership management system built using Java and MySQL. This project demonstrates the application of core OOP principles, database connectivity using JDBC, exception handling, and CRUD operations through a menu-driven interface.
 
-3. Overview
-The database was designed using a normalized structure derived from the original Pag-IBIG Membership Form. It separates data into multiple related tables to:
+# Project Overview
 
-    a. Reduce redundancy
+This system is developed using Java and MySQL.
+It allows users to perform basic system transactions such as:
 
-    b. Maintain data integrity
+  - Add Records
+  - View Records
+  - Update Records
+  - Delete Records
+
+The project demonstrates the use of:
+
+  - Classes and Objects
+  - Encapsulation
+  - Inheritance
+  - Polymorphism
+  - Abstraction
+  - Constructors and Methods
+  - Exception Handling
+  - Database Connectivity (JDBC)
+
+# Technologies Used
+
+| Technology | Purpose                    |
+| ---------- | -------------------------- |
+| Java 17    | Main Programming Language  |
+| MySQL      | Database                   |
+| JDBC       | Java Database Connectivity |
+| VS Code    | IDE                        |
+| GitHub     | Version Control            |
+
+# Required Software Installation
+1. Install Java JDK
+
+Download and install Java 17:
+Eclipse Temurin JDK
+Verify installation:
+java -version
+
+2. Install VSCode
    
-    c. Support scalable application development
+3. Install VSCode Java Extensions
 
-    All tables are connected using primary keys and foreign keys, with relationships enforced through constraints.
-   
+This includes:
+  - Language Support for Java
+  - Debugger for Java
+  - Maven for Java
+  - Test Runner for Java
 
-4. Requirements
-Before proceeding, make sure you have the following installed:
+4. Install MySQL
+  - MySQL Workbench
 
-    a. MySQL Server
-   
-    b. MySQL Workbench
-    
-    Tutorial in downloading both of these:
-    https://www.youtube.com/watch?v=wgRwITQHszU&t=114s
-
+5. Install JBDC Driver
+  - This will serve as the connection of our database with Java.
+  - https://dev.mysql.com/downloads/connector/j/
