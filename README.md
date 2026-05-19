@@ -4,7 +4,7 @@ Pag-CONNECT is a web-based Pag-IBIG membership management system built using Jav
 
 # Project Overview
 
-This system is developed using Java and MySQL.
+This system is developed using Java and MySQL. For the requirements of OOP and Information Management.
 It allows users to perform basic system transactions such as:
 
   - Add Records
@@ -41,15 +41,9 @@ Eclipse Temurin JDK
 Verify installation:
 java -version
 
-2. Install VSCode
+2. Install Eclipse/IntelliJ (Java Editor)
    
-3. Install VSCode Java Extensions
-
-This includes:
-  - Language Support for Java
-  - Debugger for Java
-  - Maven for Java
-  - Test Runner for Java
+3. Set up GitHub inside editor.
 
 4. Install MySQL
   - MySQL Workbench
@@ -68,7 +62,7 @@ Fork the Repository
 Clone Your Fork
   - git clone <your-fork-link>
 
-Open VSCode/IDE
+Open IDE
   1. In bash (terminal or ctrl + `), enter:
   - git checkout -b feature-yourname
   2. This will create your own branch, then pull latest changes:
