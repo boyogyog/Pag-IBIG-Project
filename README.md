@@ -97,7 +97,8 @@ Contains all GUI screens built with Java Swing. Each file represents one screen 
 |---|---|
 | `LoginFrame.java` | Login screen shown on startup |
 | `DashboardFrame.java` | Main menu displaying all form modules |
-| `MemberInfoForm
+| `MemberInfoForm` | Details about the membership application |
+| `...Form` | Stated in documents |
 
 ---
 
@@ -153,6 +154,7 @@ java -version
 ### 4. JDBC Driver
 - Download [MySQL Connector/J](https://dev.mysql.com/downloads/connector/j/)
 - Add the `.jar` file to your project's build path in Eclipse/IntelliJ
+- No need for this since it's already configured in the pom.xml, and Eclipse has its respective libraries already.
 
 ### 5. GitHub
 - Set up Git inside your IDE or install [Git](https://git-scm.com/downloads) separately
@@ -175,6 +177,8 @@ mysql -u root -p pagibig < database/pagibig.sql
 mysql -u root -p pagibig < database/seed.sql
 ```
 
+5. Run adding_records, all migrations
+
 ---
 
 ## Configuration
@@ -192,9 +196,7 @@ private static final String PASSWORD = "your_password_here";
 ## Collaborating on this Repository
 
 ### Create Your Branch
-```bash
-git checkout -b feature-yourname
-```
+- In Eclipse, right click then navigate to team, then there should be a push branch option.
 
 ### Pull Latest Changes Before Working
 ```bash
