@@ -9,8 +9,8 @@ INSERT INTO membertable
    Preferred_Mailing_Address, Home_TelNum, Cellphone_Num, Bus_DirectLine,
    Bus_TrunkLine, Local, Email_Address, Allow_Basic, Allow_Other_Sources, Total_Mo_Income)
 VALUES 
-  ('1212-3434-5693', 'EMPLOYED', 'EMPLOYED', 'PRIVATE',
-   'Carlo J. Reyes', 'Father Reyes', 'Mother Reyes', NULL, '1997-08-05', 'SINGLE',
+  ('1212-3434-5689', 'EMPLOYED', 'EMPLOYED', 'PRIVATE',
+   'Rhian O. Reyes', 'Father Reyes', 'Mother Reyes', NULL, '1997-08-05', 'SINGLE',
    'Pasig City', 'Filipino', 'MALE', '226000400127', 'Monthly', '123-456-589-20', '13-2343168-8',
    123428226, 'Pasig City', 'Pasig City',
    'Present Home Address', '(02) 8123-4572', '0917-000-0002', NULL,
@@ -21,7 +21,7 @@ INSERT INTO currentemprecordtable
   (PagIbig_MID_No, Company_Code, Occupation, Employment_Status, TypeOfWork,
    Country_Of_Assignment, Date_Employed)
 VALUES 
-  ('1212-3434-5683', 'SPL', 'Network Engineer', 'PERMANENT/REGULAR', NULL,
+  ('1212-3434-5689', 'HWI' , 'UNEMPLOYED', 'CASUAL', NULL,
    'Philippines', '2025-03-01');
 
 #-- ADDING COMPANY FOR PREVIOUS EMPLOYMENT:
@@ -34,11 +34,11 @@ VALUES
 INSERT INTO prevemptable 
   (PagIbig_MID_No, Company_Code, To_Date, From_Date)
 VALUES 
-  ('1212-3434-5683', 'ORACLE', '2025-01-31', '2021-05-10');
+  ('1212-3434-5689', 'ORC', '2025-01-31', '2021-05-10');
   
 #-- ADDING HEIRS:
 INSERT INTO heirstable 
   (PagIbig_MID_No, Heirs_Name, Heirs_Relationship, Heirs_Birthdate)
 VALUES 
-  ('1212-3434-5683', 'Mother Reyes', 'Mother', '1968-09-14'),
-  ('1212-3434-5683', 'Father Reyes', 'Father', '1966-03-22');
+  ('1212-3434-5689', 'Mother Reyes', 'Mother', '1968-09-14'),
+  ('1212-3434-5689', 'Father Reyes', 'Father', '1966-03-22');
