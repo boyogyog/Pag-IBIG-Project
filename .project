@@ -20,33 +20,6 @@
 		<nature>org.eclipse.jdt.core.javanature</nature>
 		<nature>org.eclipse.m2e.core.maven2Nature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>src/main/java/ui/currentEmp.png</name>
-			<type>1</type>
-			<location>C:/Users/James Patrick Isidro/Downloads/currentEmp.png</location>
-		</link>
-		<link>
-			<name>src/main/java/ui/heirs.png</name>
-			<type>1</type>
-			<location>C:/Users/James Patrick Isidro/Downloads/heirs.png</location>
-		</link>
-		<link>
-			<name>src/main/java/ui/logo.png</name>
-			<type>1</type>
-			<location>C:/Users/James Patrick Isidro/Downloads/logo.png</location>
-		</link>
-		<link>
-			<name>src/main/java/ui/memberinfo.png</name>
-			<type>1</type>
-			<location>C:/Users/James Patrick Isidro/Downloads/memberinfo.png</location>
-		</link>
-		<link>
-			<name>src/main/java/ui/prevEmp.png</name>
-			<type>1</type>
-			<location>C:/Users/James Patrick Isidro/Downloads/prevEmp.png</location>
-		</link>
-	</linkedResources>
 	<filteredResources>
 		<filter>
 			<id>1779289919489</id>
