@@ -1,4 +1,8 @@
-#-- SQL RECORD ADDING SYNTAX:
+#-- ADDING NEW COMPANY (OFW Employer):
+INSERT INTO companydetailstable 
+  (Company_Code, Company_Name, Company_Address, Office_Assignment, Branch_Location)
+VALUES 
+  ('SKEC', 'Samsung C&T Engineering', 'Riyadh, Saudi Arabia', 'BRANCH', 'Al Olaya District, Riyadh');
 
 #-- ADDING MEMBER:
 INSERT INTO membertable 
@@ -9,31 +13,30 @@ INSERT INTO membertable
    Preferred_Mailing_Address, Home_TelNum, Cellphone_Num, Bus_DirectLine,
    Bus_TrunkLine, Local, Email_Address, Allow_Basic, Allow_Other_Sources, Total_Mo_Income)
 VALUES 
-  ('1212-3434-5694', 'EMPLOYED', 'EMPLOYED', 'PRIVATE',
-   'Diana M. Villanueva', 'Father Villanueva', 'Mother Villanueva', NULL, '2000-11-18', 'SINGLE',
-   'Marikina City', 'Filipino', 'FEMALE', '226000400128', 'Monthly', '123-456-589-21', '13-2343168-9',
-   123428227, 'Marikina City', 'Marikina City',
-   'Present Home Address', '(02) 8123-4573', '0917-000-0003', NULL,
-   NULL, NULL, 'dianav@gmail.com', 52000.00, NULL, 52000.00);
-   
+  ('1212-3434-5676', 'EMPLOYED', 'OVERSEAS FILIPINO WORKER', 'PRIVATE',
+   'Ramon Cruz D. Santos', 'Eduardo D. Santos', 'Lourdes C. Santos', NULL, '1968-06-14', 'SINGLE',
+   'Caloocan City', 'Filipino', 'MALE', '226000000004', 'Monthly',
+   '321-654-987-01', '04-5678901-2',
+   99001, 'Block 5 Lot 3 Brgy. Camarin, Caloocan City', 'Block 5 Lot 3 Brgy. Camarin, Caloocan City',
+   'Permanent Home Address', NULL, '0920-000-0003', NULL,
+   NULL, NULL, 'ramon.santos@gmail.com', 60000.00, NULL, 60000.00);
+
 #-- ADDING CURRENT EMPLOYMENT:
 INSERT INTO currentemprecordtable 
   (PagIbig_MID_No, Company_Code, Occupation, Employment_Status, TypeOfWork,
    Country_Of_Assignment, Date_Employed)
 VALUES 
-  ('1212-3434-5694', 'PUP', 'Professor I', 'PERMANENT/REGULAR', NULL,
-   'Philippines', '2024-06-01');
-   
-#-- ADDING PREVIOUS EMPLOYMENT
+  ('1212-3434-5676', 'SKEC', 'Mechanical Engineer', 'CONTRACTUAL', 'LAND-BASED',
+   'Saudi Arabia', '2023-05-01');
+
+#-- ADDING PREVIOUS EMPLOYMENT:
 INSERT INTO prevemptable 
   (PagIbig_MID_No, Company_Code, To_Date, From_Date)
 VALUES 
-  ('1212-3434-5694', 'AWS', '2020-10-27', '2023-08-03');
+  ('1212-3434-5676', 'SCPH', '2023-04-30', '2019-08-01');
 
-  
 #-- ADDING HEIRS:
 INSERT INTO heirstable 
   (PagIbig_MID_No, Heirs_Name, Heirs_Relationship, Heirs_Birthdate)
 VALUES 
-  ('1212-3434-5694', 'Mother Villanueva', 'Mother', '1972-04-30'),
-  ('1212-3434-5694', 'Father Villanueva', 'Father', '1970-07-15');
+  ('1212-3434-5676', 'Miguel Jose D. Santos', 'Grandson', '2018-04-12');
