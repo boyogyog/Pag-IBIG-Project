@@ -14,6 +14,7 @@ import java.awt.event.*;
 import java.sql.Date;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.text.AbstractDocument;
 
 public class PrevEmpForm extends JPanel {
 
@@ -159,7 +160,15 @@ public class PrevEmpForm extends JPanel {
         List<String> items = new ArrayList<>();
         items.add("Select");
         for (CompanyDetailsTable c : companyList) {
-            items.add(c.getCompanyName() + " (" + c.getCompanyCode() + ")");
+            String label;
+            if ("BRANCH".equals(c.getOfficeAssignment())
+                    && c.getBranchLocation() != null
+                    && !c.getBranchLocation().isEmpty()) {
+                label = c.getCompanyName() + " - Branch - " + c.getBranchLocation();
+            } else {
+                label = c.getCompanyName() + " - Head Office";
+            }
+            items.add(label);
         }
         items.add("Other (Add New Company)");
         companyDisplayItems = items.toArray(new String[0]);
@@ -187,18 +196,16 @@ public class PrevEmpForm extends JPanel {
             if (entry.toDateField.getText().trim().isEmpty()) {
                 showError("Entry " + entryNum + ": Please enter the To date."); return;
             }
-
-            Date fromDate, toDate;
-            try {
-                fromDate = Date.valueOf(entry.fromDateField.getText().trim());
-            } catch (IllegalArgumentException ex) {
-                showError("Entry " + entryNum + ": From date must be YYYY-MM-DD."); return;
+            String fromError = validateDate(entry.fromDateField.getText().trim());
+            if (fromError != null) {
+                showError("Entry " + entryNum + ": From date — " + fromError); return;
             }
-            try {
-                toDate = Date.valueOf(entry.toDateField.getText().trim());
-            } catch (IllegalArgumentException ex) {
-                showError("Entry " + entryNum + ": To date must be YYYY-MM-DD."); return;
+            String toError = validateDate(entry.toDateField.getText().trim());
+            if (toError != null) {
+                showError("Entry " + entryNum + ": To date — " + toError); return;
             }
+            Date fromDate = Date.valueOf(entry.fromDateField.getText().trim());
+            Date toDate   = Date.valueOf(entry.toDateField.getText().trim());
 
             if (!toDate.after(fromDate)) {
                 showError("Entry " + entryNum + ": To date must be after From date."); return;
@@ -227,8 +234,11 @@ public class PrevEmpForm extends JPanel {
                         "BRANCH".equals(newOffice) ? newBranch : null
                 );
 
+                String baseCode = companyCode;
+                int suffix = 1;
                 while (companyDAO.companyCodeExists(companyCode)) {
-                    companyCode = companyCode + "1";
+                    companyCode = baseCode + suffix;
+                    suffix++;
                     newCompany.setCompanyCode(companyCode);
                 }
 
@@ -240,13 +250,34 @@ public class PrevEmpForm extends JPanel {
                 loadCompanies();
 
             } else {
-                String selected = (String) entry.companyBox.getSelectedItem();
-                companyCode = selected.substring(
-                        selected.lastIndexOf("(") + 1, selected.lastIndexOf(")"));
+            	String selected = (String) entry.companyBox.getSelectedItem();
+            	CompanyDetailsTable match = companyList.stream()
+            	    .filter(comp -> {
+            	        String lbl;
+            	        if ("BRANCH".equals(comp.getOfficeAssignment())
+            	                && comp.getBranchLocation() != null
+            	                && !comp.getBranchLocation().isEmpty()) {
+            	            lbl = comp.getCompanyName() + " - Branch - " + comp.getBranchLocation();
+            	        } else {
+            	            lbl = comp.getCompanyName() + " - Head Office";
+            	        }
+            	        return lbl.equals(selected);
+            	    })
+            	    .findFirst().orElse(null);
+
+            	if (match == null) {
+            	    showError("Entry " + entryNum + ": Could not resolve company. Please re-select."); return;
+            	}
+            	companyCode = match.getCompanyCode();
+
+            	if (match == null) {
+            	    showError("Entry " + entryNum + ": Could not resolve company. Please re-select."); return;
+            	}
+            	companyCode = match.getCompanyCode();
             }
 
             // ── Insert prev emp record ────────────────────────────────────────
-            PrevEmpTable record = new PrevEmpTable(mid, companyCode, fromDate, toDate);
+            PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
             if (!dao.insertPrevEmp(record)) {
                 showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
             }
@@ -266,20 +297,76 @@ public class PrevEmpForm extends JPanel {
 
     // ── Generate Company Code ─────────────────────────────────────────────────
     private String generateCompanyCode(String name) {
-        StringBuilder code = new StringBuilder();
-        java.util.Set<String> skip = new java.util.HashSet<>(
-                java.util.Arrays.asList("of", "the", "and", "for", "a", "an", "in", "at", "to"));
-        for (String word : name.split("\\s+")) {
-            if (!skip.contains(word.toLowerCase()) && !word.isEmpty())
-                code.append(Character.toUpperCase(word.charAt(0)));
+        String[] skipWords = {"of", "the", "and", "for", "a", "an", "in", "at", "to"};
+        java.util.Set<String> skip = new java.util.HashSet<>(java.util.Arrays.asList(skipWords));
+
+        String[] words = name.split("\\s+");
+        List<String> meaningful = new ArrayList<>();
+        for (String word : words) {
+            if (!word.isEmpty() && !skip.contains(word.toLowerCase())) {
+                meaningful.add(word);
+            }
         }
-        return code.toString().toUpperCase();
+
+        String code;
+        if (meaningful.size() >= 3) {
+            // 3+ words → acronym, max 3 letters
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < Math.min(3, meaningful.size()); i++) {
+                sb.append(Character.toUpperCase(meaningful.get(i).charAt(0)));
+            }
+            code = sb.toString();
+        } else if (meaningful.size() == 2) {
+            // 2 words → first 3 letters combined
+            String combined = meaningful.get(0) + meaningful.get(1);
+            code = combined.substring(0, Math.min(3, combined.length())).toUpperCase();
+        } else if (meaningful.size() == 1) {
+            // 1 word → first 3 letters
+            code = meaningful.get(0).substring(0, Math.min(3, meaningful.get(0).length())).toUpperCase();
+        } else {
+            code = name.replaceAll("\\s+", "").substring(0, Math.min(3, name.length())).toUpperCase();
+        }
+
+        return code;
     }
 
     private void showError(String msg) {
         JOptionPane.showMessageDialog(
                 SwingUtilities.getWindowAncestor(this),
                 msg, "Validation Error", JOptionPane.WARNING_MESSAGE);
+    }
+
+    // ── Add this right after showError ────────────────────────────────────────
+    private String validateDate(String dateStr) {
+        if (dateStr.length() != 10) return "Date must be in YYYY-MM-DD format.";
+        int year, month, day;
+        try {
+            year  = Integer.parseInt(dateStr.substring(0, 4));
+            month = Integer.parseInt(dateStr.substring(5, 7));
+            day   = Integer.parseInt(dateStr.substring(8, 10));
+        } catch (NumberFormatException e) {
+            return "Date must be in YYYY-MM-DD format.";
+        }
+        int currentYear = java.time.LocalDate.now().getYear();
+        if (year < 1900 || year > currentYear)
+            return "Year must be between 1900 and " + currentYear + ".";
+        if (month < 1 || month > 12)
+            return "Month must be between 01 and 12.";
+        int maxDays;
+        switch (month) {
+            case 1: case 3: case 5: case 7:
+            case 8: case 10: case 12: maxDays = 31; break;
+            case 4: case 6: case 9: case 11: maxDays = 30; break;
+            case 2:
+                boolean isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+                maxDays = isLeap ? 29 : 28; break;
+            default: maxDays = 30;
+        }
+        if (day < 1 || day > maxDays)
+            return "Day must be between 01 and " + maxDays + " for the selected month.";
+        if (java.time.LocalDate.of(year, month, day).isAfter(java.time.LocalDate.now()))
+            return "Date cannot be in the future.";
+        return null;
     }
 
     // ── Add Entry ─────────────────────────────────────────────────────────────
@@ -337,10 +424,10 @@ public class PrevEmpForm extends JPanel {
             setAlignmentX(Component.LEFT_ALIGNMENT);
 
             // Dynamic height — taller when new company panel is visible
-            setMaximumSize(new Dimension(Integer.MAX_VALUE, 280));
-            setMinimumSize(new Dimension(0, 200));
-            setPreferredSize(new Dimension(0, 200));
-
+            setMaximumSize(new Dimension(Integer.MAX_VALUE, 500));
+            setMinimumSize(new Dimension(0, 420));
+            setPreferredSize(new Dimension(0, 420));
+            
             JPanel inner = new JPanel(new BorderLayout(0, 0)) {
                 @Override protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g.create();
@@ -439,22 +526,129 @@ public class PrevEmpForm extends JPanel {
             nc2.add(newCompanyBranchPanel);
             newCompanyPanel.add(nc2);
 
-            // Show/hide new company panel
+         // ── Existing Company Info Panel ───────────────────────────────────────────
+            JPanel existingCompanyPanel = new JPanel();
+            existingCompanyPanel.setOpaque(false);
+            existingCompanyPanel.setLayout(new BoxLayout(existingCompanyPanel, BoxLayout.Y_AXIS));
+            existingCompanyPanel.setVisible(false);
+
+            JPanel ec1 = row(2);
+            JTextField existingNameField    = buildTextField();
+            JTextField existingAddressField = buildTextField();
+            existingNameField.setEditable(false);
+            existingAddressField.setEditable(false);
+            existingNameField.setForeground(accentAmber);
+            existingAddressField.setForeground(accentAmber);
+            ec1.add(fieldPanel("COMPANY NAME", existingNameField));
+            ec1.add(fieldPanel("COMPANY ADDRESS", existingAddressField));
+            existingCompanyPanel.add(ec1);
+            existingCompanyPanel.add(Box.createVerticalStrut(8));
+
+            JPanel ec2 = row(2);
+            JTextField existingOfficeField = buildTextField();
+            JTextField existingBranchField = buildTextField();
+            existingOfficeField.setEditable(false);
+            existingBranchField.setEditable(false);
+            existingOfficeField.setForeground(accentAmber);
+            existingBranchField.setForeground(accentAmber);
+            ec2.add(fieldPanel("OFFICE ASSIGNMENT", existingOfficeField));
+            ec2.add(fieldPanel("BRANCH LOCATION", existingBranchField));
+            existingCompanyPanel.add(ec2);
+            existingCompanyPanel.add(Box.createVerticalStrut(8));
+
+            // ── Show/hide panels based on selection ──────────────────────────────────
             companyBox.addActionListener(e -> {
-                boolean isOther = "Other (Add New Company)".equals(companyBox.getSelectedItem());
-                newCompanyPanel.setVisible(isOther);
-                fields.revalidate(); fields.repaint();
+                String selected = (String) companyBox.getSelectedItem();
+                if (selected == null || "Select".equals(selected)) {
+                    newCompanyPanel.setVisible(false);
+                    existingCompanyPanel.setVisible(false);
+                } else if ("Other (Add New Company)".equals(selected)) {
+                    newCompanyPanel.setVisible(true);
+                    existingCompanyPanel.setVisible(false);
+                } else {
+                    newCompanyPanel.setVisible(false);
+                    existingCompanyPanel.setVisible(true);
+
+                    CompanyDetailsTable found = companyList.stream()
+                        .filter(comp -> {
+                            String lbl;
+                            if ("BRANCH".equals(comp.getOfficeAssignment())
+                                    && comp.getBranchLocation() != null
+                                    && !comp.getBranchLocation().isEmpty()) {
+                                lbl = comp.getCompanyName() + " - Branch - " + comp.getBranchLocation();
+                            } else {
+                                lbl = comp.getCompanyName() + " - Head Office";
+                            }
+                            return lbl.equals(selected);
+                        })
+                        .findFirst().orElse(null);
+
+                    if (found != null) {
+                        existingNameField.setText(found.getCompanyName());
+                        existingAddressField.setText(found.getCompanyAddress());
+                        existingOfficeField.setText(found.getOfficeAssignment());
+                        existingBranchField.setText(
+                            found.getBranchLocation() != null ? found.getBranchLocation() : "N/A");
+                    }
+                }
+                fields.revalidate();
+                fields.repaint();
             });
 
-            // Row 2: From / To dates
+         // Row 2: From / To dates
             JPanel r2 = row(2);
             r2.add(fieldPanel("FROM DATE (YYYY-MM-DD) *", fromDateField = buildTextField()));
             r2.add(fieldPanel("TO DATE (YYYY-MM-DD) *",   toDateField   = buildTextField()));
 
+            // ── Date filter ───────────────────────────────────────────────────────────
+            for (JTextField dateField : new JTextField[]{fromDateField, toDateField}) {
+                ((javax.swing.text.AbstractDocument) dateField.getDocument())
+                    .setDocumentFilter(new javax.swing.text.DocumentFilter() {
+                    @Override
+                    public void replace(javax.swing.text.DocumentFilter.FilterBypass fb,
+                            int offset, int length, String string,
+                            javax.swing.text.AttributeSet attr)
+                            throws javax.swing.text.BadLocationException {
+                        String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                        if (string.isEmpty() && length > 0) {
+                            super.replace(fb, offset, length, string, attr);
+                            return;
+                        }
+                        if (!string.matches("\\d*")) return;
+                        String currentRaw = current.replace("-", "");
+                        String cursorRaw  = current.substring(0, offset).replace("-", "");
+                        String newRaw     = cursorRaw + string + currentRaw.substring(cursorRaw.length());
+                        if (newRaw.length() > 8) return;
+                        String formatted = formatDate(newRaw);
+                        fb.replace(0, current.length(), formatted, attr);
+                        int newCursor = cursorRaw.length() + string.length();
+                        if (newCursor >= 4) newCursor++;
+                        if (newCursor >= 7) newCursor++;
+                        final int pos = Math.min(newCursor, formatted.length());
+                        SwingUtilities.invokeLater(() -> dateField.setCaretPosition(pos));
+                    }
+                    @Override
+                    public void insertString(javax.swing.text.DocumentFilter.FilterBypass fb,
+                            int offset, String string,
+                            javax.swing.text.AttributeSet attr)
+                            throws javax.swing.text.BadLocationException {
+                        replace(fb, offset, 0, string, attr);
+                    }
+                    private String formatDate(String digits) {
+                        if (digits.length() <= 4) return digits;
+                        if (digits.length() <= 6)
+                            return digits.substring(0, 4) + "-" + digits.substring(4);
+                        return digits.substring(0, 4) + "-" + digits.substring(4, 6)
+                                + "-" + digits.substring(6);
+                    }
+                });
+            }
+
             fields.add(Box.createVerticalStrut(12));
-            fields.add(r1);
+            fields.add(r1);            
             fields.add(Box.createVerticalStrut(8));
             fields.add(newCompanyPanel);
+            fields.add(existingCompanyPanel);
             fields.add(Box.createVerticalStrut(8));
             fields.add(r2);
 
