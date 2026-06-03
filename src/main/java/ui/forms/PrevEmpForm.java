@@ -28,6 +28,7 @@ public class PrevEmpForm extends JPanel {
     private JPanel listPanel;
     private int empCount = 0;
     public List<PrevEmpEntry> entries = new ArrayList<>();
+    public List<Integer> deletedCodes = new ArrayList<>();
 
     // ── Company list loaded once, shared by all entries ───────────────────────
     private List<CompanyDetailsTable> companyList = new ArrayList<>();
@@ -146,7 +147,7 @@ public class PrevEmpForm extends JPanel {
         bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
-        addEntry(); // start with one blank entry
+        loadExistingEntries();
     }
 
     // ── Load Companies from DB ────────────────────────────────────────────────
@@ -174,22 +175,28 @@ public class PrevEmpForm extends JPanel {
         companyDisplayItems = items.toArray(new String[0]);
     }
 
-    // ── Handle Save ───────────────────────────────────────────────────────────
+ // ── Handle Save ───────────────────────────────────────────────────
     private void handleSave() {
         String mid = RegistrationSession.getInstance().getTempMID();
         PrevEmpDAO dao = new PrevEmpDAO();
         CompanyDAO companyDAO = new CompanyDAO();
 
+        // ── Delete removed entries first ──────────────────────────────
+        for (int code : deletedCodes) {
+            dao.deletePrevEmp(code);
+        }
+        deletedCodes.clear();
+
         for (int i = 0; i < entries.size(); i++) {
             PrevEmpEntry entry = entries.get(i);
             int entryNum = i + 1;
 
-            // ── Validate company ──────────────────────────────────────────────
+            // ── Validate company ──────────────────────────────────────
             if ("Select".equals(entry.companyBox.getSelectedItem())) {
                 showError("Entry " + entryNum + ": Please select a company."); return;
             }
 
-            // ── Validate dates ────────────────────────────────────────────────
+            // ── Validate dates ────────────────────────────────────────
             if (entry.fromDateField.getText().trim().isEmpty()) {
                 showError("Entry " + entryNum + ": Please enter the From date."); return;
             }
@@ -211,7 +218,7 @@ public class PrevEmpForm extends JPanel {
                 showError("Entry " + entryNum + ": To date must be after From date."); return;
             }
 
-            // ── Resolve company code ──────────────────────────────────────────
+            // ── Resolve company code ──────────────────────────────────
             String companyCode;
             boolean isNew = "Other (Add New Company)".equals(entry.companyBox.getSelectedItem());
 
@@ -246,44 +253,47 @@ public class PrevEmpForm extends JPanel {
                     showError("Entry " + entryNum + ": Failed to save new company."); return;
                 }
 
-                // Reload company list so subsequent entries see the new company
                 loadCompanies();
 
             } else {
-            	String selected = (String) entry.companyBox.getSelectedItem();
-            	CompanyDetailsTable match = companyList.stream()
-            	    .filter(comp -> {
-            	        String lbl;
-            	        if ("BRANCH".equals(comp.getOfficeAssignment())
-            	                && comp.getBranchLocation() != null
-            	                && !comp.getBranchLocation().isEmpty()) {
-            	            lbl = comp.getCompanyName() + " - Branch - " + comp.getBranchLocation();
-            	        } else {
-            	            lbl = comp.getCompanyName() + " - Head Office";
-            	        }
-            	        return lbl.equals(selected);
-            	    })
-            	    .findFirst().orElse(null);
+                String selected = (String) entry.companyBox.getSelectedItem();
+                CompanyDetailsTable match = companyList.stream()
+                    .filter(comp -> {
+                        String lbl;
+                        if ("BRANCH".equals(comp.getOfficeAssignment())
+                                && comp.getBranchLocation() != null
+                                && !comp.getBranchLocation().isEmpty()) {
+                            lbl = comp.getCompanyName() + " - Branch - " + comp.getBranchLocation();
+                        } else {
+                            lbl = comp.getCompanyName() + " - Head Office";
+                        }
+                        return lbl.equals(selected);
+                    })
+                    .findFirst().orElse(null);
 
-            	if (match == null) {
-            	    showError("Entry " + entryNum + ": Could not resolve company. Please re-select."); return;
-            	}
-            	companyCode = match.getCompanyCode();
-
-            	if (match == null) {
-            	    showError("Entry " + entryNum + ": Could not resolve company. Please re-select."); return;
-            	}
-            	companyCode = match.getCompanyCode();
+                if (match == null) {
+                    showError("Entry " + entryNum + ": Could not resolve company. Please re-select."); return;
+                }
+                companyCode = match.getCompanyCode();
             }
 
-            // ── Insert prev emp record ────────────────────────────────────────
-            PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
-            if (!dao.insertPrevEmp(record)) {
-                showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
+            // ── Insert or Update ──────────────────────────────────────
+            if (entry.prevEmpCode > 0) {
+                // Existing record → UPDATE
+                PrevEmpTable record = new PrevEmpTable(mid, entry.prevEmpCode, companyCode, toDate, fromDate);
+                if (!dao.updatePrevEmp(record)) {
+                    showError("Entry " + entryNum + ": Failed to update. Please try again."); return;
+                }
+            } else {
+                // New record → INSERT
+                PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
+                if (!dao.insertPrevEmp(record)) {
+                    showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
+                }
             }
         }
 
-        // ── All entries saved ─────────────────────────────────────────────────
+        // ── All entries saved ─────────────────────────────────────────
         RegistrationSession.getInstance().setPrevEmpDone(true);
 
         JOptionPane.showMessageDialog(PrevEmpForm.this,
@@ -294,7 +304,6 @@ public class PrevEmpForm extends JPanel {
         if (w != null) w.dispose();
         SwingUtilities.invokeLater(() -> new SignUpFrame());
     }
-
     // ── Generate Company Code ─────────────────────────────────────────────────
     private String generateCompanyCode(String name) {
         String[] skipWords = {"of", "the", "and", "for", "a", "an", "in", "at", "to"};
@@ -336,6 +345,19 @@ public class PrevEmpForm extends JPanel {
                 msg, "Validation Error", JOptionPane.WARNING_MESSAGE);
     }
 
+    // ── Set date text bypassing the document filter ───────────────────
+    private void setDateTextDirect(JTextField field, String value) {
+        javax.swing.text.AbstractDocument doc =
+            (javax.swing.text.AbstractDocument) field.getDocument();
+        javax.swing.text.DocumentFilter existing = doc.getDocumentFilter();
+        try {
+            doc.setDocumentFilter(null);
+            field.setText(value);
+        } finally {
+            doc.setDocumentFilter(existing);
+        }
+    }
+
     // ── Add this right after showError ────────────────────────────────────────
     private String validateDate(String dateStr) {
         if (dateStr.length() != 10) return "Date must be in YYYY-MM-DD format.";
@@ -368,6 +390,54 @@ public class PrevEmpForm extends JPanel {
             return "Date cannot be in the future.";
         return null;
     }
+ // ── Load Existing Records from DB ─────────────────────────────────────────
+    private void loadExistingEntries() {
+        String mid = RegistrationSession.getInstance().getTempMID();
+        List<PrevEmpTable> existing = new PrevEmpDAO().getPrevEmpByMID(mid);
+
+        if (existing.isEmpty()) {
+            addEntry();
+            return;
+        }
+
+        for (PrevEmpTable record : existing) {
+            empCount++;
+            PrevEmpEntry entry = new PrevEmpEntry(empCount, this);
+            entries.add(entry);
+            entry.prevEmpCode = record.getPrevEmpCode();
+
+            // ← Company FIRST (before adding to panel)
+            String companyCode = record.getCompanyCode();
+            CompanyDetailsTable company = companyList.stream()
+                .filter(c -> c.getCompanyCode().equals(companyCode))
+                .findFirst().orElse(null);
+
+            if (company != null) {
+                String label;
+                if ("BRANCH".equals(company.getOfficeAssignment())
+                        && company.getBranchLocation() != null
+                        && !company.getBranchLocation().isEmpty()) {
+                    label = company.getCompanyName() + " - Branch - " + company.getBranchLocation();
+                } else {
+                    label = company.getCompanyName() + " - Head Office";
+                }
+                entry.companyBox.setSelectedItem(label);
+            }
+
+            // ← Add to panel SECOND
+            listPanel.add(entry);
+            listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
+
+            SwingUtilities.invokeLater(() -> {
+                if (record.getFromDate() != null)
+                    setDateTextDirect(entry.fromDateField, record.getFromDate().toString());
+                if (record.getToDate() != null)
+                    setDateTextDirect(entry.toDateField, record.getToDate().toString());
+            });
+        }
+        listPanel.revalidate();
+        listPanel.repaint();
+    }
 
     // ── Add Entry ─────────────────────────────────────────────────────────────
     public void addEntry() {
@@ -389,6 +459,7 @@ public class PrevEmpForm extends JPanel {
             return;
         }
         entries.remove(entry);
+        if (entry.prevEmpCode > 0) deletedCodes.add(entry.prevEmpCode);
         Component[] comps = listPanel.getComponents();
         for (int i = 0; i < comps.length; i++) {
             if (comps[i] == entry) {
@@ -406,6 +477,7 @@ public class PrevEmpForm extends JPanel {
     public class PrevEmpEntry extends JPanel {
 
         private JLabel numberLabel;
+        public int prevEmpCode = 0; // 0 = new record, >0 = existing
         public JComboBox<String> companyBox;
         public JTextField fromDateField;
         public JTextField toDateField;
