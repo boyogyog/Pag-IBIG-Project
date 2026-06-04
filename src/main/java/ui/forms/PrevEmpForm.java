@@ -286,7 +286,11 @@ public class PrevEmpForm extends JPanel {
                 }
             } else {
                 // New record → INSERT
-                PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
+            	PrevEmpTable record = new PrevEmpTable();
+            	record.setPagIbigMIDNo(mid);
+            	record.setCompanyCode(companyCode);
+            	record.setFromDate(fromDate);
+            	record.setToDate(toDate);
                 if (!dao.insertPrevEmp(record)) {
                     showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
                 }

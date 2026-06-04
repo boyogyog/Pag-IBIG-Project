@@ -1,5 +1,7 @@
 package ui.forms;
 
+import main.RegistrationSession;
+import ui.frames.SetUpPassword;
 import dao.HeirsDAO;
 import models.HeirsTable;
 import ui.frames.SignUpFrame;
@@ -175,9 +177,22 @@ public class HeirsForm extends JPanel {
                }
            }
            JOptionPane.showMessageDialog(this,
-               saved + " heir(s) saved successfully!",
-               "Heirs Saved", JOptionPane.INFORMATION_MESSAGE);
-           isSaved = true;
+        		    saved + " heir(s) saved successfully!",
+        		    "Heirs Saved", JOptionPane.INFORMATION_MESSAGE);
+        		isSaved = true;
+
+        		RegistrationSession session = RegistrationSession.getInstance();
+        		session.setHeirsDone(true);
+
+        		Window currentWindow = SwingUtilities.getWindowAncestor(HeirsForm.this);
+        		if (currentWindow != null) currentWindow.dispose();
+
+        		if (session.isMemberInfoDone() && session.isCurrentEmpDone()) {
+        		    SwingUtilities.invokeLater(() -> new SetUpPassword());
+        		} else {
+        		    SwingUtilities.invokeLater(() -> new ui.frames.SignUpFrame());
+        		}
+           
        });
        bottomBar.add(returnBtn);
        bottomBar.add(continueBtn);
