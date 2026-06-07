@@ -38,7 +38,6 @@ public class MemberInfoFormView extends JPanel {
     public JTextField allowBasicField, allowOtherSourcesField, totalMoIncomeField;
 
     private JButton editSaveBtn;
-    private JButton deleteBtn;
 
     public MemberInfoFormView(String mid) {
         this.loggedInMID = mid;
@@ -61,7 +60,7 @@ public class MemberInfoFormView extends JPanel {
                 g2.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        bg.setLayout(new GridBagLayout());
+        bg.setLayout(new BorderLayout());
 
         JPanel card = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -81,7 +80,7 @@ public class MemberInfoFormView extends JPanel {
             }
         };
         card.setOpaque(false);
-        card.setPreferredSize(new Dimension(980, 650));
+        //card.setPreferredSize(new Dimension(980, 720));
         card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(24, 24, 24, 24));
 
@@ -107,7 +106,7 @@ public class MemberInfoFormView extends JPanel {
         // ── Bottom Buttons ────────────────────────────────────────────────────
         JButton backBtn = buildButton("Back", accentRed);
         editSaveBtn     = buildButton("Edit", accentAmber);
-        deleteBtn       = buildButton("Delete Account", new Color(200, 50, 50));
+        //deleteBtn       = buildButton("Delete Account", new Color(200, 50, 50));
 
         backBtn.addActionListener(e -> {
             Window window = SwingUtilities.getWindowAncestor(MemberInfoFormView.this);
@@ -127,19 +126,23 @@ public class MemberInfoFormView extends JPanel {
             }
         });
 
-        deleteBtn.addActionListener(e -> handleDelete());
+        //deleteBtn.addActionListener(e -> handleDelete());
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         bottom.setOpaque(false);
         bottom.setBorder(new EmptyBorder(18, 0, 0, 0));
-        bottom.add(deleteBtn);
+        //bottom.add(deleteBtn);
         bottom.add(backBtn);
         bottom.add(editSaveBtn);
 
         card.add(header, BorderLayout.NORTH);
         card.add(scroll,  BorderLayout.CENTER);
         card.add(bottom,  BorderLayout.SOUTH);
-        bg.add(card);
+        JPanel cardWrap = new JPanel(new BorderLayout());
+        cardWrap.setOpaque(false);
+        cardWrap.setBorder(new EmptyBorder(28, 28, 28, 28));
+        cardWrap.add(card, BorderLayout.CENTER);
+        bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
         if (loggedInMID != null && !loggedInMID.isEmpty()) {

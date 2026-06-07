@@ -176,7 +176,7 @@ public class CurrentEmpFormView extends JPanel {
     // ── Load Data ─────────────────────────────────────────────────────────────
     private void loadData() {
         CurrentEmpDAO dao = new CurrentEmpDAO();
-        CurrentEmpRecordTable record = dao.getByMID(loggedInMID);
+        CurrentEmpRecordTable record = dao.getCurrentEmpByMID(loggedInMID);
 
         if (record == null) {
             JOptionPane.showMessageDialog(this,
