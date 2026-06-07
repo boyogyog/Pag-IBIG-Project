@@ -7,7 +7,7 @@
 -- 2. membertable (30 new members)
 -- ============================================================
 
-INSERT INTO membertable VALUES
+INSERT ignore INTO membertable VALUES
 -- ('1212-3434-5731','EMPLOYED','EMPLOYED',NULL,'PRIVATE',NULL,'Santos, Maria Clara A.','Roberto Santos','Lourdes Aquino',NULL,'1990-03-15','SINGLE','Manila','Filipino','FEMALE','CRN10000001','MONTHLY','123-456-789-00','34-5678901-2',10001,'123 Taft Ave., Pasay City','123 Taft Ave., Pasay City','PRESENT','02-85551001','09171000001',NULL,NULL,NULL,'maria.santos@gmail.com',75000.00,20000.00,95000.00),
 ('1212-3434-5732','EMPLOYED','EMPLOYED',NULL,'PRIVATE',NULL,'Reyes, Jose Miguel B.','Eduardo Reyes','Carmen Bautista',NULL,'1988-07-22','SINGLE','Quezon City','Filipino','MALE','CRN10000002','MONTHLY','234-567-890-01','45-6789012-3',10002,'456 Katipunan Ave., Quezon City','456 Katipunan Ave., Quezon City','PRESENT','02-85552002','09172000002',NULL,NULL,NULL,'jose.reyes@yahoo.com',85000.00,15000.00,100000.00),
 ('1212-3434-5733','EMPLOYED','EMPLOYED',NULL,'GOVERNMENT',NULL,'Dela Cruz, Ana Beatriz C.','Fernando Dela Cruz','Gloria Mendoza',NULL,'1992-11-05','SINGLE','Makati City','Filipino','FEMALE','CRN10000003','MONTHLY','345-678-901-02','56-7890123-4',10003,'789 Ayala Ave., Makati City','789 Ayala Ave., Makati City','PRESENT','02-85553003','09173000003',NULL,NULL,NULL,'ana.delacruz@gmail.com',90000.00,10000.00,100000.00),
