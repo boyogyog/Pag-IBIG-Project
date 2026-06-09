@@ -329,7 +329,7 @@ public class SignInFrame extends JFrame {
             JFrame frame = new JFrame("Pag-CONNECT — Current Employment");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(1100, 750);
-            frame.add(new CurrentEmpFormView());
+            frame.add(new CurrentEmpFormView(loggedInMID));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
             SignInFrame.this.dispose();
@@ -339,7 +339,7 @@ public class SignInFrame extends JFrame {
             JFrame frame = new JFrame("Pag-CONNECT — Previous Employment");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(1100, 750);
-            frame.add(new PrevEmpFormView());
+            frame.add(new PrevEmpFormView(loggedInMID));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
             SignInFrame.this.dispose();
