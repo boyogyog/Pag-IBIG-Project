@@ -40,6 +40,10 @@ public class MemberInfoForm extends JFrame {
     // ── "Others" wrapper panels (shown/hidden) ───────────────────────────────
     private JPanel membershipTypeOthersPanel;
     private JPanel membershipCategoryOthersPanel;
+    private JTextField citizenshipOthersField;
+    private JPanel     citizenshipOthersPanel;
+    public JTextField membershipCategoryOtherEarningField;
+    private JPanel    membershipCategoryOtherEarningPanel;
 
     private boolean recordExists = false;
 
@@ -212,18 +216,39 @@ public class MemberInfoForm extends JFrame {
         setCombo(membershipCategoryBox,           fromDbMembershipCategory(existing.getMembershipCategory()));
         setCombo(maritalStatusBox,                fromDbMarital(existing.getMaritalStatus()));
         setCombo(sexBox,                          toTitleCase(existing.getSex()));
-        setCombo(citizenshipBox,                  existing.getCitizenship() != null
-                                                      ? existing.getCitizenship() : "Select");
+        String savedCitizenship = existing.getCitizenship();
+        boolean knownCitizenship = false;
+        if (savedCitizenship != null) {
+            for (int i = 0; i < citizenshipBox.getItemCount(); i++) {
+                if (citizenshipBox.getItemAt(i).equals(savedCitizenship)) {
+                    knownCitizenship = true;
+                    break;
+                }
+            }
+        }
+        if (knownCitizenship) {
+            setCombo(citizenshipBox, savedCitizenship);
+        } else if (savedCitizenship != null) {
+            setCombo(citizenshipBox, "Other");
+            citizenshipOthersPanel.setVisible(true);
+            setText(citizenshipOthersField, savedCitizenship);
+        } else {
+            setCombo(citizenshipBox, "Select");
+        }
         setCombo(frequencyOfMembershipSavingsBox, existing.getFrequencyOfMembershipSavings());
         setCombo(preferredMailingAddressBox,      existing.getPreferredMailingAddress());
 
         if ("Others".equals(membershipTypeBox.getSelectedItem())) {
             setText(membershipTypeOthersField, existing.getMembershipTypeOthers());
             membershipTypeOthersPanel.setVisible(true);
+            membershipTypeOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+            membershipTypeOthersPanel.setPreferredSize(new Dimension(0, 70));
         }
-        if ("Others".equals(membershipCategoryBox.getSelectedItem())) {
-            setText(membershipCategoryOthersField, existing.getMembershipCategoryOthers());
-            membershipCategoryOthersPanel.setVisible(true);
+        if ("Other Earning Groups".equals(membershipCategoryBox.getSelectedItem())) {
+            setText(membershipCategoryOtherEarningField, existing.getMembershipCategoryOthers());
+            membershipCategoryOtherEarningPanel.setVisible(true);
+            membershipCategoryOtherEarningPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+            membershipCategoryOtherEarningPanel.setPreferredSize(new Dimension(0, 70));
         }
 
         RegistrationSession session = RegistrationSession.getInstance();
@@ -278,7 +303,7 @@ public class MemberInfoForm extends JFrame {
             case "PROFESSIONAL/BUSINESS OWNER": return "Professional/Business Owner";
             case "JOB ORDER PERSONNEL":         return "Job Order Personnel";
             case "OTHER EARNING GROUPS":        return "Other Earning Groups";
-            default:                            return "Others";
+            default:                            return "Select";
         }
     }
 
@@ -340,16 +365,31 @@ public class MemberInfoForm extends JFrame {
                 : null;
 
         String membershipCategory = (String) membershipCategoryBox.getSelectedItem();
-        String membershipCategoryOthers = membershipCategory.equals("Others")
-                ? membershipCategoryOthersField.getText().trim()
-                : null;
+        String membershipCategoryOthers;
+        if (membershipCategory.equals("Other Earning Groups")) {
+            membershipCategoryOthers = membershipCategoryOtherEarningField.getText().trim();
+            // optional — not required
+        } else {
+            membershipCategoryOthers = null;
+        }
 
         String occupationalStatus = toDbEnum((String) occupationalStatusBox.getSelectedItem());
         String membershipTypeDb   = toMembershipTypeEnum(membershipType);
         String membershipCatDb    = toMembershipCategoryEnum(membershipCategory);
         String maritalStatus      = toMaritalEnum((String) maritalStatusBox.getSelectedItem());
         String sex                = ((String) sexBox.getSelectedItem()).toUpperCase();
-        String citizenship        = citizenshipBox.getSelectedItem().equals("Filipino") ? "Filipino" : citizenshipBox.getSelectedItem().toString();
+        String citizenship;
+        if ("Filipino".equals(citizenshipBox.getSelectedItem())) {
+            citizenship = "Filipino";
+        } else if ("Other".equals(citizenshipBox.getSelectedItem())) {
+            citizenship = citizenshipOthersField.getText().trim();
+            if (citizenship.isEmpty()) {
+                showError("Please specify your citizenship.");
+                return;
+            }
+        } else {
+            citizenship = (String) citizenshipBox.getSelectedItem();
+        }
         String frequency          = (String) frequencyOfMembershipSavingsBox.getSelectedItem();
         String mailingAddress     = toMailingEnum((String) preferredMailingAddressBox.getSelectedItem());
 
@@ -460,32 +500,43 @@ public class MemberInfoForm extends JFrame {
         membershipCategoryBox = cb(new String[]{
                 "Select", "Private", "Government", "Private Household",
                 "Overseas Filipino Worker", "Professional/Business Owner",
-                "Job Order Personnel", "Other Earning Groups", "Others"
+                "Job Order Personnel", "Other Earning Groups"
         });
         r1.add(lf("Membership Category *", membershipCategoryBox));
         c.add(r1);
         c.add(vgap(10));
 
-        membershipTypeOthersField = tf(100);
+        membershipTypeOthersField = tf(100); // ← ASSIGN FIRST
         membershipTypeOthersPanel = othersPanel("Membership Type — please specify", membershipTypeOthersField);
         membershipTypeOthersPanel.setVisible(false);
+        membershipTypeOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 0));
+        membershipTypeOthersPanel.setPreferredSize(new Dimension(0, 0));
         c.add(membershipTypeOthersPanel);
 
-        membershipCategoryOthersField = tf(100);
-        membershipCategoryOthersPanel = othersPanel("Membership Category — please specify", membershipCategoryOthersField);
-        membershipCategoryOthersPanel.setVisible(false);
-        c.add(membershipCategoryOthersPanel);
-
+        membershipCategoryOtherEarningField = tf(100);
+        membershipCategoryOtherEarningPanel = othersPanel("Other Earning Groups — please specify", membershipCategoryOtherEarningField);
+        membershipCategoryOtherEarningPanel.setVisible(false);
+        membershipCategoryOtherEarningPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 0));
+        membershipCategoryOtherEarningPanel.setPreferredSize(new Dimension(0, 0));
+        c.add(membershipCategoryOtherEarningPanel);
+        
         membershipTypeBox.addActionListener(e -> {
             boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
             membershipTypeOthersPanel.setVisible(show);
+            membershipTypeOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, show ? 70 : 0));
+            membershipTypeOthersPanel.setPreferredSize(new Dimension(0, show ? 70 : 0));
             c.revalidate();
             c.repaint();
         });
 
         membershipCategoryBox.addActionListener(e -> {
-            boolean show = "Others".equals(membershipCategoryBox.getSelectedItem());
-            membershipCategoryOthersPanel.setVisible(show);
+            String selected = (String) membershipCategoryBox.getSelectedItem();
+            boolean showOtherEarning = "Other Earning Groups".equals(selected);
+
+            membershipCategoryOtherEarningPanel.setVisible(showOtherEarning);
+            membershipCategoryOtherEarningPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, showOtherEarning ? 70 : 0));
+            membershipCategoryOtherEarningPanel.setPreferredSize(new Dimension(0, showOtherEarning ? 70 : 0));
+
             c.revalidate();
             c.repaint();
         });
@@ -529,14 +580,30 @@ public class MemberInfoForm extends JFrame {
                 })));
         c.add(r5);
         c.add(vgap(16));
-
+        
         JPanel r6 = row(3);
         r6.add(lf("Sex *",         sexBox         = cb(new String[]{"Select", "Male", "Female"})));
         r6.add(lf("Citizenship *", citizenshipBox = cb(new String[]{"Select", "Filipino", "Other"})));
         r6.add(lf("CRN",           crnField       = tf(12)));
         c.add(r6);
         c.add(vgap(16));
+        citizenshipOthersField = tf(100);
+        citizenshipOthersPanel = othersPanel("Citizenship — please specify", citizenshipOthersField);
+        citizenshipOthersPanel.setVisible(false);
+        citizenshipOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 0));
+        citizenshipOthersPanel.setPreferredSize(new Dimension(0, 0));
+        c.add(citizenshipOthersPanel); // ← THIS WAS MISSING
+        c.add(vgap(16));
 
+        citizenshipBox.addActionListener(e -> {
+            boolean show = "Other".equals(citizenshipBox.getSelectedItem());
+            citizenshipOthersPanel.setVisible(show);
+            citizenshipOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, show ? 70 : 0));
+            citizenshipOthersPanel.setPreferredSize(new Dimension(0, show ? 70 : 0));
+            c.revalidate();
+            c.repaint();
+        });
+        
         JPanel r7 = row(3);
         r7.add(lf("TIN",           tinField            = tf(14)));
         r7.add(lf("SSS No.",       sssField            = tf(12)));
@@ -870,6 +937,7 @@ public class MemberInfoForm extends JFrame {
             case "Employed":                 return "EMPLOYED";
             case "Overseas Filipino Worker": return "OVERSEAS FILIPINO WORKER";
             case "Self-Employed":            return "SELF-EMPLOYED";
+            case "Others":                   return "OTHERS";
             default:                         return "EMPLOYED";
         }
     }

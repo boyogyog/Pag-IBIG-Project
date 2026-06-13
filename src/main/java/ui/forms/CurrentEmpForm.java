@@ -46,6 +46,8 @@ public class CurrentEmpForm extends JPanel {
     private JComboBox<String> newCompanyOfficeBox;
     private JTextField newCompanyBranchField;
     private JPanel   newCompanyBranchPanel;
+    private JTextField countryOthersField;
+    private JPanel     countryOthersPanel;
 
     // ── Company list from DB ──────────────────────────────────────────────────
     private List<CompanyDetailsTable> companyList;
@@ -593,21 +595,31 @@ public class CurrentEmpForm extends JPanel {
         })));
         c.add(r2); 
         // ── Disable TypeOfWork if Philippines ─────────────────────────────────
+        countryOthersField = buildTextField();
+        countryOthersPanel = new JPanel(new GridLayout(1, 1));
+        countryOthersPanel.setOpaque(false);
+        countryOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75));
+        countryOthersPanel.add(fieldPanel("COUNTRY — please specify", countryOthersField));
+        countryOthersPanel.setVisible(false);
+        c.add(countryOthersPanel);
         countryOfAssignmentBox.addActionListener(e -> {
             String country = (String) countryOfAssignmentBox.getSelectedItem();
+            boolean isOther = "Other".equals(country);
             boolean isOfw = country != null
                             && !"Select".equals(country)
                             && !"Philippines".equals(country);
 
+            countryOthersPanel.setVisible(isOther);
             typeOfWorkBox.setEnabled(isOfw);
             if (!isOfw) typeOfWorkBox.setSelectedItem("Select");
 
-            // Hide/show arrow button
             for (Component comp : typeOfWorkBox.getComponents()) {
                 if (comp instanceof AbstractButton) {
                     comp.setVisible(isOfw);
                 }
             }
+            c.revalidate();
+            c.repaint();
         });
 
         return c;
@@ -652,7 +664,21 @@ public class CurrentEmpForm extends JPanel {
         employmentStatusBox.setSelectedItem(record.getEmploymentStatus());
 
         // Country of assignment (fires listener which enables/disables typeOfWork)
-        countryOfAssignmentBox.setSelectedItem(record.getCountryOfAssignment());
+        String savedCountry = record.getCountryOfAssignment();
+        boolean knownCountry = false;
+        for (int i = 0; i < countryOfAssignmentBox.getItemCount(); i++) {
+            if (countryOfAssignmentBox.getItemAt(i).equals(savedCountry)) {
+                knownCountry = true;
+                break;
+            }
+        }
+        if (knownCountry) {
+            countryOfAssignmentBox.setSelectedItem(savedCountry);
+        } else {
+            countryOfAssignmentBox.setSelectedItem("Other");
+            countryOthersPanel.setVisible(true);
+            setDateTextDirect(countryOthersField, savedCountry);
+        }
 
         // Type of work (set after country so the box is enabled if OFW)
         if (record.getTypeOfWork() != null) {
@@ -787,6 +813,13 @@ public class CurrentEmpForm extends JPanel {
         String mid = RegistrationSession.getInstance().getTempMID();
         // ✅ Fixed — required only for OFW
         String country = (String) countryOfAssignmentBox.getSelectedItem();
+        if ("Other".equals(country)) {
+            country = countryOthersField.getText().trim();
+            if (country.isEmpty()) {
+                showError("Please specify the country of assignment.");
+                return;
+            }
+        }
         boolean isOfw = !"Philippines".equals(country);
 
         if (isOfw && "Select".equals(typeOfWorkBox.getSelectedItem())) {
@@ -803,7 +836,7 @@ public class CurrentEmpForm extends JPanel {
                 occupationField.getText().trim(),
                 (String) employmentStatusBox.getSelectedItem(),
                 typeOfWork,
-                (String) countryOfAssignmentBox.getSelectedItem(),
+                country, // ← USE the resolved country variable instead
                 dateEmployed
         );
 
