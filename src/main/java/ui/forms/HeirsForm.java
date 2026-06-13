@@ -167,7 +167,17 @@ public class HeirsForm extends JPanel {
                    HeirsTable heir = new HeirsTable();
                    heir.setPagIbigMIDNo(loggedInMid);
                    heir.setHeirsName(en.heirsNameField.getText().trim());
-                   heir.setHeirsRelationship((String) en.heirsRelationshipBox.getSelectedItem());
+                   String rel = (String) en.heirsRelationshipBox.getSelectedItem();
+                   if ("Other".equals(rel)) {
+                       rel = en.heirsRelationshipOthersField.getText().trim();
+                       if (rel.isEmpty()) {
+                           JOptionPane.showMessageDialog(this,
+                        		   "Heir " + (entries.indexOf(en) + 1) + ": Please specify the relationship.",
+                               "Missing Field", JOptionPane.WARNING_MESSAGE);
+                           return;
+                       }
+                   }
+                   heir.setHeirsRelationship(rel);
                    heir.setHeirsBirthdate(Date.valueOf(en.heirsBirthdateField.getText().trim()));
                    if (dao.insertHeir(heir)) saved++;
                } catch (Exception ex) {
@@ -224,7 +234,21 @@ public class HeirsForm extends JPanel {
                entry.pagIbigMidNoField.setBackground(new Color(10, 20, 42));
                entry.pagIbigMidNoField.setForeground(new Color(251, 191, 36));
                entry.heirsNameField.setText(heir.getHeirsName());
-               entry.heirsRelationshipBox.setSelectedItem(heir.getHeirsRelationship());
+               String savedRel = heir.getHeirsRelationship();
+               boolean knownRel = false;
+               for (int i = 0; i < entry.heirsRelationshipBox.getItemCount(); i++) {
+                   if (entry.heirsRelationshipBox.getItemAt(i).equals(savedRel)) {
+                       knownRel = true;
+                       break;
+                   }
+               }
+               if (knownRel) {
+                   entry.heirsRelationshipBox.setSelectedItem(savedRel);
+               } else {
+                   entry.heirsRelationshipBox.setSelectedItem("Other");
+                   entry.heirsRelationshipOthersField.setText(savedRel);
+                   entry.heirsRelationshipOthersPanel.setVisible(true);
+               }
                entry.heirsBirthdateField.setText(
                    heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
                entries.add(entry);
@@ -282,12 +306,14 @@ public class HeirsForm extends JPanel {
        public JTextField        heirsNameField;
        public JTextField        heirsBirthdateField;
        public JComboBox<String> heirsRelationshipBox;
+       public JTextField heirsRelationshipOthersField;
+       private JPanel    heirsRelationshipOthersPanel;
        public HeirEntry(int number, HeirsForm parent) {
            setLayout(new BorderLayout());
            setOpaque(false);
            // Height: header(~30) + divider(1) + gap(10) + row1(52) + gap(10) + row2(52) + padding(28*2) = ~211
            // Give it 215 so nothing is clipped
-           int H = 215;
+           int H = 290;
            setMaximumSize(new Dimension(Integer.MAX_VALUE, H));
            setMinimumSize(new Dimension(0, H));
            setPreferredSize(new Dimension(0, H));
@@ -351,6 +377,25 @@ public class HeirsForm extends JPanel {
            fields.add(row1);
            fields.add(Box.createVerticalStrut(10));
            fields.add(row2);
+
+           // ── Relationship Others field ─────────────────────────────────────
+           heirsRelationshipOthersField = buildTextField();
+           heirsRelationshipOthersPanel = new JPanel(new GridLayout(1, 1, 14, 0));
+           heirsRelationshipOthersPanel.setOpaque(false);
+           heirsRelationshipOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+           heirsRelationshipOthersPanel.setPreferredSize(new Dimension(0, 60));
+           heirsRelationshipOthersPanel.setMinimumSize(new Dimension(0, 60));
+           heirsRelationshipOthersPanel.add(fieldPanel("RELATIONSHIP — please specify", heirsRelationshipOthersField));
+           heirsRelationshipOthersPanel.setVisible(false);
+           fields.add(Box.createVerticalStrut(10));
+           fields.add(heirsRelationshipOthersPanel);
+
+           heirsRelationshipBox.addActionListener(e -> {
+               boolean show = "Other".equals(heirsRelationshipBox.getSelectedItem());
+               heirsRelationshipOthersPanel.setVisible(show);
+               fields.revalidate();
+               fields.repaint();
+           });
            inner.add(headerBlock, BorderLayout.NORTH);
            inner.add(fields,      BorderLayout.CENTER);
            add(inner, BorderLayout.CENTER);
