@@ -3,7 +3,9 @@ package ui.utils;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
-import ui.frames.ConfirmationFrame;
+import dao.UserCredentialsDAO;
+import models.UserCredentials;
+import ui.frames.SignInFrame;
 
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -11,6 +13,8 @@ import java.awt.event.MouseEvent;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.geom.RoundRectangle2D;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public class SetUpPassword extends JFrame {
 
@@ -30,7 +34,16 @@ public class SetUpPassword extends JFrame {
     private JPasswordField confirmField;
     private JLabel        feedbackLabel;
 
+    // ── MID of the member whose account is being set up ──────────────────────
+    private final String mid;
+
+    // ── No-arg constructor (backward compat / standalone testing) ────────────
     public SetUpPassword() {
+        this(null);
+    }
+
+    public SetUpPassword(String mid) {
+        this.mid = mid;
         setTitle("Pag-CONNECT — Set Up Password");
         setSize(1024, 768);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -265,16 +278,47 @@ public class SetUpPassword extends JFrame {
         showFeedback("✔  Password set successfully!", accentGreen);
         confirmField.setBorder(new EmptyBorder(10, 16, 10, 16));
 
-        // Navigate after brief pause
+        // ── Save hashed password to usercredentials table ────────────────────
+        if (mid != null && !mid.isEmpty()) {
+            String hashed = hashPassword(pass);
+            UserCredentials uc = new UserCredentials(
+                    mid, hashed,
+                    "", "",   // Security_Q1 / A1 — set up later via Settings
+                    "", "",   // Security_Q2 / A2
+                    "", ""    // Security_Q3 / A3
+            );
+            UserCredentialsDAO ucDao = new UserCredentialsDAO();
+            boolean saved = ucDao.insertCredentials(uc);
+            if (!saved) {
+                showFeedback("✖  Failed to save password. Please try again.", accentRed);
+                return;
+            }
+        }
+
+        // Navigate to the navigation/dashboard page after a brief pause
         Timer delay = new Timer(1200, e -> {
             JOptionPane.showMessageDialog(this,
-                "Your password has been set. You may now acquire your Pag-IBIG MID No. after it has been confirmed.",
+                "Your account is ready! Welcome to Pag-CONNECT.",
                 "Success", JOptionPane.INFORMATION_MESSAGE);
-            new ConfirmationFrame();
             dispose();
+            SwingUtilities.invokeLater(() -> new SignInFrame(mid));
         });
         delay.setRepeats(false);
         delay.start();
+    }
+
+    // ── Hash password using SHA-256 ─────────────────────────────────────────
+    private String hashPassword(String plain) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(plain.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception ex) {
+            // Fallback — should not happen since SHA-256 is always available
+            return plain;
+        }
     }
 
     private void showFeedback(String message, Color color) {

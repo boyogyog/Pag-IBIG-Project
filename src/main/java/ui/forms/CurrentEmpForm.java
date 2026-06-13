@@ -92,6 +92,7 @@ public class CurrentEmpForm extends JPanel {
         scroll.getViewport().setOpaque(false);
         scroll.setBorder(null);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
         // ── Title ─────────────────────────────────────────────────────────────
         JPanel titlePanel = new JPanel(new BorderLayout());
@@ -158,6 +159,42 @@ public class CurrentEmpForm extends JPanel {
         loadExistingRecord();
     }
     
+    // ── Auto-pad month/day with a leading zero if single-digit ───────────────
+    private void applyDatePadAndFormat(JTextField f) {
+        String raw = f.getText().replaceAll("[^0-9]", "");
+        if (raw.isEmpty()) return;
+
+        String year = raw.length() >= 4 ? raw.substring(0, 4) : raw;
+        String rest = raw.length() >  4 ? raw.substring(4)    : "";
+
+        if (rest.length() == 1) {
+            rest = "0" + rest;
+        } else if (rest.length() == 3) {
+            if (rest.charAt(0) == '0') {
+                rest = rest.substring(0, 2) + "0" + rest.substring(2);
+            } else {
+                rest = "0" + rest;
+            }
+        }
+
+        String padded = year + rest;
+        StringBuilder formatted = new StringBuilder();
+        for (int i = 0; i < padded.length(); i++) {
+            if (i == 4 || i == 6) formatted.append("-");
+            formatted.append(padded.charAt(i));
+        }
+
+        if (!formatted.toString().equals(f.getText())) {
+            AbstractDocument doc = (AbstractDocument) f.getDocument();
+            javax.swing.text.DocumentFilter filter = doc.getDocumentFilter();
+            doc.setDocumentFilter(null);
+            f.setText(formatted.toString());
+            doc.setDocumentFilter(filter);
+            int len = f.getDocument().getLength();
+            f.setCaretPosition(Math.min(formatted.length(), len));
+        }
+    }
+
  // ── Date Validation ─────────────────────────────────────────────────────
     private String validateDate(String dateStr) {
         // Must be complete
@@ -229,6 +266,11 @@ public class CurrentEmpForm extends JPanel {
         companyBox.setFont(new Font("Arial", Font.PLAIN, 14));
         companyBox.setForeground(Color.WHITE);
         companyBox.setBackground(new Color(25, 35, 60));
+        // Cap the combo box's preferred width regardless of how long company
+        // names are — without this, a long company name from the DB can blow
+        // up the row width and overflow the card horizontally.
+        companyBox.setPrototypeDisplayValue("A reasonably long company name here");
+        companyBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         loadCompanies();
         r0.add(fieldPanel("COMPANY *", companyBox));
         c.add(r0);
@@ -440,6 +482,26 @@ public class CurrentEmpForm extends JPanel {
                 return digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6);
             }
         });
+
+        // ── Auto-pad single-digit month/day with a leading zero ───────────────
+        // Triggers on Space, Enter, or when the field loses focus.
+        dateEmployedField.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
+                        || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                    e.consume();
+                    SwingUtilities.invokeLater(() -> applyDatePadAndFormat(dateEmployedField));
+                }
+            }
+        });
+        dateEmployedField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                applyDatePadAndFormat(dateEmployedField);
+            }
+        });
+
         c.add(r1);
         c.add(gap(16));
 

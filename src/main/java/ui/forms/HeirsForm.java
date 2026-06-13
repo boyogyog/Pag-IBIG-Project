@@ -1,8 +1,7 @@
 package ui.forms;
 
-import main.RegistrationSession;
-import ui.frames.SetUpPassword;
 import dao.HeirsDAO;
+import main.RegistrationSession;
 import models.HeirsTable;
 import ui.frames.SignUpFrame;
 import javax.swing.*;
@@ -176,23 +175,21 @@ public class HeirsForm extends JPanel {
                    return;
                }
            }
+           isSaved = true;
+
+           // ── Mark Heirs as done in the registration session ────────────────
+           RegistrationSession session = RegistrationSession.getInstance();
+           session.setHeirsDone(true);
+
+           // ── Always return to Sign Up dashboard — submission to password
+           //    setup happens via the Submit button on that page ──────────────
            JOptionPane.showMessageDialog(this,
-        		    saved + " heir(s) saved successfully!",
-        		    "Heirs Saved", JOptionPane.INFORMATION_MESSAGE);
-        		isSaved = true;
+               saved + " heir(s) saved successfully!",
+               "Heirs Saved", JOptionPane.INFORMATION_MESSAGE);
 
-        		RegistrationSession session = RegistrationSession.getInstance();
-        		session.setHeirsDone(true);
-
-        		Window currentWindow = SwingUtilities.getWindowAncestor(HeirsForm.this);
-        		if (currentWindow != null) currentWindow.dispose();
-
-        		if (session.isMemberInfoDone() && session.isCurrentEmpDone()) {
-        		    SwingUtilities.invokeLater(() -> new SetUpPassword());
-        		} else {
-        		    SwingUtilities.invokeLater(() -> new ui.frames.SignUpFrame());
-        		}
-           
+           Window currentWindow = SwingUtilities.getWindowAncestor(HeirsForm.this);
+           if (currentWindow != null) currentWindow.dispose();
+           SwingUtilities.invokeLater(() -> new SignUpFrame().setVisible(true));
        });
        bottomBar.add(returnBtn);
        bottomBar.add(continueBtn);
@@ -391,7 +388,7 @@ public class HeirsForm extends JPanel {
            new EmptyBorder(8, 12, 8, 12)));
        return f;
    }
-   // ── Date field: auto-inserts dashes, max 10 chars (YYYY-MM-DD) ───────────
+   // ── Date field: auto-inserts dashes, pads month/day with leading zero ─────
    private JTextField buildDateField() {
        JTextField f = new JTextField();
        f.setForeground(Color.WHITE);
@@ -401,39 +398,107 @@ public class HeirsForm extends JPanel {
        f.setBorder(new CompoundBorder(
            new LineBorder(new Color(255, 255, 255, 40), 1, true),
            new EmptyBorder(8, 12, 8, 12)));
+
        f.addKeyListener(new java.awt.event.KeyAdapter() {
            @Override
            public void keyTyped(java.awt.event.KeyEvent e) {
                char c = e.getKeyChar();
-               // Only allow digits; block everything else
+               // Block non-digits
                if (!Character.isDigit(c)) {
                    e.consume();
                    return;
                }
-               // Strip existing dashes to count raw digits
-               String digits = f.getText().replaceAll("-", "");
-               if (digits.length() >= 8) {
-                   e.consume(); // max 8 digits reached
+               // Block if already at 8 raw digits
+               if (f.getText().replaceAll("[^0-9]", "").length() >= 8) {
+                   e.consume();
                    return;
                }
-               // Allow the digit, then auto-append dash if needed
-               SwingUtilities.invokeLater(() -> {
-                   String raw = f.getText().replaceAll("[^0-9]", "");
-                   if (raw.length() > 8) raw = raw.substring(0, 8);
-                   StringBuilder sb = new StringBuilder();
-                   for (int i = 0; i < raw.length(); i++) {
-                       if (i == 4 || i == 6) sb.append('-');
-                       sb.append(raw.charAt(i));
-                   }
-                   String formatted = sb.toString();
-                   if (!formatted.equals(f.getText())) {
-                       f.setText(formatted);
-                       f.setCaretPosition(formatted.length());
-                   }
-               });
+               SwingUtilities.invokeLater(() -> applyFormat(f));
+           }
+
+           @Override
+           public void keyPressed(java.awt.event.KeyEvent e) {
+               // Space or Enter triggers pad + format on current input
+               if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
+                       || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                   e.consume();
+                   SwingUtilities.invokeLater(() -> applyPadAndFormat(f));
+               }
            }
        });
+
+       // Pad on Tab away or click elsewhere
+       f.addFocusListener(new java.awt.event.FocusAdapter() {
+           @Override
+           public void focusLost(java.awt.event.FocusEvent e) {
+               applyPadAndFormat(f);
+           }
+       });
+
        return f;
+   }
+
+   /** Just formats raw digits with dashes — no padding. */
+   private void applyFormat(JTextField f) {
+       String raw = f.getText().replaceAll("[^0-9]", "");
+       if (raw.length() > 8) raw = raw.substring(0, 8);
+       String formatted = insertDashes(raw);
+       if (!formatted.equals(f.getText())) {
+           f.setText(formatted);
+           f.setCaretPosition(formatted.length());
+       }
+   }
+
+   /**
+    * Pads month and day with a leading zero if single-digit, then formats.
+    * Works by splitting the raw digits into year (4) + month (1-2) + day (1-2).
+    * Padding rule: if after the year we have an odd number of digits,
+    * the current segment (month or day) is a single digit — prepend 0.
+    */
+   private void applyPadAndFormat(JTextField f) {
+       String raw = f.getText().replaceAll("[^0-9]", "");
+       if (raw.isEmpty()) return;
+
+       String year = raw.length() >= 4 ? raw.substring(0, 4) : raw;
+       String rest = raw.length() >  4 ? raw.substring(4)    : "";
+
+       // rest can be 0-4 digits representing MM + DD
+       // Length 1 → single digit month only         e.g. "1"      → "01"
+       // Length 2 → full month only                 e.g. "01"     → "01"
+       // Length 3 → could be: MMD (month+1-digit day) or MDD (1-digit month+2-digit day)
+       //            We decide: if rest[0]=='0', month is "0X" (2 digits), day is 1 digit
+       //                       otherwise month is 1 digit, day is 2 digits
+       // Length 4 → full month + full day            e.g. "0101"  → no change
+
+       if (rest.length() == 1) {
+           // Only month, single digit
+           rest = "0" + rest;
+       } else if (rest.length() == 3) {
+           if (rest.charAt(0) == '0') {
+               // Month is already "0X" (2 digits), day is the last 1 digit
+               rest = rest.substring(0, 2) + "0" + rest.substring(2);
+           } else {
+               // Month is 1 digit, day is 2 digits
+               rest = "0" + rest;
+           }
+       }
+
+       String padded    = year + rest;
+       String formatted = insertDashes(padded);
+       if (!formatted.equals(f.getText())) {
+           f.setText(formatted);
+           f.setCaretPosition(formatted.length());
+       }
+   }
+
+   /** Inserts dashes after position 4 and 6 of a raw digit string. */
+   private String insertDashes(String raw) {
+       StringBuilder sb = new StringBuilder();
+       for (int i = 0; i < raw.length(); i++) {
+           if (i == 4 || i == 6) sb.append('-');
+           sb.append(raw.charAt(i));
+       }
+       return sb.toString();
    }
    private JComboBox<String> buildComboBox(String[] items) {
        JComboBox<String> box = new JComboBox<>(items);

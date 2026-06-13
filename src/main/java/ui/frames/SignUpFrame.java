@@ -9,6 +9,7 @@ import ui.forms.CurrentEmpForm;
 import ui.forms.HeirsForm;
 import ui.forms.MemberInfoForm;
 import ui.forms.PrevEmpForm;
+import ui.utils.SetUpPassword;
 
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -317,7 +318,7 @@ public class SignUpFrame extends JFrame {
             submitAppBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
             submitAppBtn.addActionListener(e -> {
                 dispose();
-                SwingUtilities.invokeLater(() -> new SetUpPassword());
+                SwingUtilities.invokeLater(() -> new SetUpPassword(tempMID));
             });
 
             southPanel.add(submitAppBtn);
