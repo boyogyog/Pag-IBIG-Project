@@ -12,7 +12,7 @@ public class DatabaseConnection {
 
     private static final String URL      = "jdbc:mysql://localhost:3306/pagibig";
     private static final String USERNAME = "root";
-    private static final String PASSWORD = "adminuser";
+    private static final String PASSWORD = "sqlroot123";
     //private static final String PASSWORD = "yeshua26.";
 
     /**

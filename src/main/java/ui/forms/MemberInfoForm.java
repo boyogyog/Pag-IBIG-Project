@@ -649,7 +649,64 @@ public class MemberInfoForm extends JFrame {
                 }
             });
 
+        // ── Auto-pad single-digit month/day with a leading zero ───────────────
+        // Triggers on Space, Enter, or when the field loses focus.
+        field.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
+                        || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                    e.consume();
+                    SwingUtilities.invokeLater(() -> applyDatePadAndFormat(field));
+                }
+            }
+        });
+        field.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                applyDatePadAndFormat(field);
+            }
+        });
+
         return field;
+    }
+
+    /**
+     * Pads month and day with a leading zero if single-digit, then formats.
+     * Splits raw digits into year (4) + rest (month/day digits) and decides
+     * which segment needs padding based on the length and shape of "rest".
+     */
+    private void applyDatePadAndFormat(JTextField f) {
+        String raw = f.getText().replaceAll("[^0-9]", "");
+        if (raw.isEmpty()) return;
+
+        String year = raw.length() >= 4 ? raw.substring(0, 4) : raw;
+        String rest = raw.length() >  4 ? raw.substring(4)    : "";
+
+        if (rest.length() == 1) {
+            // Only month, single digit, e.g. "1" → "01"
+            rest = "0" + rest;
+        } else if (rest.length() == 3) {
+            if (rest.charAt(0) == '0') {
+                // Month already 2 digits ("0X"), day is the last 1 digit
+                rest = rest.substring(0, 2) + "0" + rest.substring(2);
+            } else {
+                // Month is 1 digit, day is 2 digits
+                rest = "0" + rest;
+            }
+        }
+
+        String padded = year + rest;
+        StringBuilder formatted = new StringBuilder();
+        for (int i = 0; i < padded.length(); i++) {
+            if (i == 4 || i == 6) formatted.append("-");
+            formatted.append(padded.charAt(i));
+        }
+
+        if (!formatted.toString().equals(f.getText())) {
+            f.setText(formatted.toString());
+            f.setCaretPosition(formatted.length());
+        }
     }
 
     // ── ADDED: tfPhone() — auto-prefixes (+63) and formats as (+63) 999 999 9999
