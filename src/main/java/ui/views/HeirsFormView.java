@@ -20,17 +20,11 @@ public class HeirsFormView extends JPanel {
     private final Color accentRed   = new Color(255, 99, 132);
     private final Color textWhite   = Color.WHITE;
 
-    private JPanel listPanel;
-    private int heirCount = 0;
-    public List<HeirEntry> entries = new ArrayList<>();
-
-    private final String loggedInMID;
-
-    // ── Constructors ─────────────────────────────────────────────────────────
-    public HeirsFormView(String mid) {
-        this.loggedInMID = mid;
-        initUI();
-    }
+    private JPanel  listPanel;
+    private JButton editSaveBtn;
+    private boolean editMode = false;
+    private int     heirCount = 0;
+    public  List<HeirEntry> entries = new ArrayList<>();
 
     // ── Logged-in member's MID (set from session) ────────────────────────────
     private final String loggedInMid;
@@ -91,20 +85,27 @@ public class HeirsFormView extends JPanel {
         subHeading.setForeground(new Color(255, 255, 255, 160));
         subHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        headerPanel.add(heading);
-        headerPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-        headerPanel.add(subHeading);
-
-        // ── List Panel (scrollable) ───────────────────────────────────────────
-        listPanel = new JPanel();
+        // ── List Panel ───────────────────────────────────────────────────────
+        listPanel = new JPanel() {
+            @Override public boolean getScrollableTracksViewportWidth() {
+                return true; // let the list panel resize to the viewport width
+            }
+        };
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         listPanel.setOpaque(false);
+        listPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        // Leave a little room on the right so content isn't crowded by the scrollbar
+        listPanel.setBorder(new EmptyBorder(0, 0, 0, 10));
 
-        JScrollPane scroll = new JScrollPane(listPanel);
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.setBorder(null);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        // ── Scroll Pane wrapping the list ───────────────────────────────────
+        JScrollPane scrollPane = new JScrollPane(listPanel);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(null);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         // ── Buttons ───────────────────────────────────────────────────────────
         JButton addBtn  = buildButton("+ Add Heir", accentGreen);
@@ -124,27 +125,70 @@ public class HeirsFormView extends JPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         buttonPanel.setOpaque(false);
 
+        JButton deleteBtn = buildButton("Delete All", new Color(200, 50, 50));
         JButton returnBtn = buildButton("Back", accentRed);
+        JButton addBtn    = buildButton("Add Heir", new Color(96, 216, 164));
+        editSaveBtn       = buildButton("Edit", new Color(251, 191, 36));
 
         returnBtn.addActionListener(e -> {
-    	    Window window = SwingUtilities.getWindowAncestor(HeirsFormView.this);
-    	    if (window != null) window.dispose();
-    	    new SignInFrame(loggedInMid); // go back to the dashboard
-    	});
+            Window window = SwingUtilities.getWindowAncestor(HeirsFormView.this);
+            if (window != null) window.dispose();
+            new SignInFrame(loggedInMid); // go back to the dashboard
+        });
 
+        addBtn.addActionListener(e -> {
+            if (!editMode) {
+                JOptionPane.showMessageDialog(HeirsFormView.this,
+                    "Click Edit before adding a new heir.",
+                    "Edit Mode Required", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            addEntry();
+        });
+
+        editSaveBtn.addActionListener(e -> {
+            if (!editMode) {
+                editMode = true;
+                editSaveBtn.setText("Save Changes");
+                unlockAllEntries();
+            } else {
+                handleSave();
+            }
+        });
+
+        deleteBtn.addActionListener(e -> {
+            int choice = JOptionPane.showConfirmDialog(HeirsFormView.this,
+                "Delete all heirs and dependents? This cannot be undone.",
+                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (choice != JOptionPane.YES_OPTION) return;
+            new HeirsDAO().deleteAllHeirsByMID(loggedInMid);
+            JOptionPane.showMessageDialog(HeirsFormView.this,
+                "All heirs and dependents deleted.");
+            entries.clear();
+            listPanel.removeAll();
+            heirCount = 0;
+            listPanel.revalidate();
+            listPanel.repaint();
+            editMode = false;
+            editSaveBtn.setText("Edit");
+        });
+
+        buttonPanel.add(deleteBtn);
         buttonPanel.add(returnBtn);
+        buttonPanel.add(addBtn);
+        buttonPanel.add(editSaveBtn);
         buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // ── Content wrapper ───────────────────────────────────────────────────
-        JPanel content = new JPanel(new BorderLayout());
-        content.setOpaque(false);
-        content.setBorder(new EmptyBorder(20, 0, 0, 0));
-        content.add(scroll, BorderLayout.CENTER);
+        // ── Assemble ─────────────────────────────────────────────────────────
+        content.add(heading);
+        content.add(Box.createRigidArea(new Dimension(0, 4)));
+        content.add(subHeading);
+        content.add(Box.createRigidArea(new Dimension(0, 30)));
+        content.add(scrollPane);
+        content.add(Box.createRigidArea(new Dimension(0, 20)));
+        content.add(buttonPanel);
 
-        card.add(headerPanel, BorderLayout.NORTH);
-        card.add(content,     BorderLayout.CENTER);
-        card.add(buttonPanel, BorderLayout.SOUTH);
-
+        card.add(content, BorderLayout.CENTER);
         bg.add(card);
         add(bg, BorderLayout.CENTER);
 
@@ -159,27 +203,34 @@ public class HeirsFormView extends JPanel {
         List<HeirsTable> saved = dao.getHeirsByMID(loggedInMid);
 
         if (saved.isEmpty()) {
-            // No saved heirs yet — start with one blank entry
-            addEntry();
-        } else {
-            for (HeirsTable heir : saved) {
-                heirCount++;
-                HeirEntry entry = new HeirEntry(heirCount, this);
-                entry.pagIbigMidNoField.setText(loggedInMid);
-                entry.pagIbigMidNoField.setEditable(false);
-                entry.pagIbigMidNoField.setFocusable(false);
-                entry.heirsNameField.setText(heir.getHeirsName());
-                entry.heirsRelationshipBox.setSelectedItem(heir.getHeirsRelationship());
-                entry.heirsBirthdateField.setText(
-                    heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
-                entries.add(entry);
-                listPanel.add(entry);
-                listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
-            }
-            listPanel.revalidate();
-            listPanel.repaint();
+            JLabel noData = new JLabel("No heirs or dependents on record.");
+            noData.setForeground(new Color(255, 255, 255, 150));
+            noData.setFont(new Font("Arial", Font.ITALIC, 14));
+            noData.setAlignmentX(Component.LEFT_ALIGNMENT);
+            listPanel.add(noData);
+            return;
         }
+
+        for (HeirsTable heir : saved) {
+            heirCount++;
+            HeirEntry entry = new HeirEntry(heirCount, this);
+            entry.heirCode = heir.getHeirCode(); // ← assumes HeirsTable exposes getHeirCode()
+            entry.pagIbigMidNoField.setText(loggedInMid);
+            entry.heirsNameField.setText(heir.getHeirsName());
+            entry.heirsRelationshipBox.setSelectedItem(heir.getHeirsRelationship());
+            entry.heirsBirthdateField.setText(
+                heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
+            entries.add(entry);
+            listPanel.add(entry);
+            listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
+        }
+
+        lockAllEntries();
+        listPanel.revalidate();
+        listPanel.repaint();
     }
+
+    // ── Add a new (blank, editable) entry ─────────────────────────────────────
     public void addEntry() {
         heirCount++;
 
@@ -189,6 +240,14 @@ public class HeirsFormView extends JPanel {
         entry.pagIbigMidNoField.setText(loggedInMid);
         entry.pagIbigMidNoField.setEditable(false);
         entry.pagIbigMidNoField.setFocusable(false);
+
+        // New entry is unlocked so it can be filled in immediately
+        entry.heirsNameField.setEditable(true);
+        entry.heirsNameField.setFocusable(true);
+        entry.heirsBirthdateField.setEditable(true);
+        entry.heirsBirthdateField.setFocusable(true);
+        entry.heirsRelationshipBox.setEnabled(true);
+        entry.setRemoveBtnVisible(true);
 
         entries.add(entry);
         listPanel.add(entry);
@@ -206,15 +265,14 @@ public class HeirsFormView extends JPanel {
             return;
         }
 
-        // If it has a DB record, delete it
-        if (entry.heirCode > 0) {
-            int confirm = JOptionPane.showConfirmDialog(this,
-                "Delete this heir from the database?",
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-            if (confirm != JOptionPane.YES_OPTION) return;
+        int choice = JOptionPane.showConfirmDialog(this,
+            "Remove this heir / dependent record?",
+            "Confirm Remove", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (choice != JOptionPane.YES_OPTION) return;
 
-            HeirsDAO dao = new HeirsDAO();
-            dao.deleteHeir(entry.heirCode);
+        // Use existing deleteHeir(int) from HeirsDAO if this entry was persisted
+        if (entry.heirCode > 0) {
+            new HeirsDAO().deleteHeir(entry.heirCode);
         }
 
         entries.remove(entry);
@@ -231,25 +289,95 @@ public class HeirsFormView extends JPanel {
         listPanel.repaint();
     }
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // ── Heir Entry Inner Class ────────────────────────────────────────────────
-    // ═════════════════════════════════════════════════════════════════════════
+    // ── Unlock all entries for editing ────────────────────────────────────────
+    private void unlockAllEntries() {
+        for (HeirEntry entry : entries) {
+            entry.heirsNameField.setEditable(true);
+            entry.heirsNameField.setFocusable(true);
+            entry.heirsBirthdateField.setEditable(true);
+            entry.heirsBirthdateField.setFocusable(true);
+            entry.heirsRelationshipBox.setEnabled(true);
+            entry.setRemoveBtnVisible(true);
+        }
+    }
+
+    // ── Lock all entries after save ───────────────────────────────────────────
+    private void lockAllEntries() {
+        for (HeirEntry entry : entries) {
+            entry.heirsNameField.setEditable(false);
+            entry.heirsNameField.setFocusable(false);
+            entry.heirsBirthdateField.setEditable(false);
+            entry.heirsBirthdateField.setFocusable(false);
+            entry.heirsRelationshipBox.setEnabled(false);
+            entry.setRemoveBtnVisible(false);
+        }
+    }
+
+    // ── Save ──────────────────────────────────────────────────────────────────
+    private void handleSave() {
+        for (HeirEntry entry : entries) {
+            if (entry.heirsNameField.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                    "Please enter a name for all heirs.",
+                    "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if ("Select".equals(entry.heirsRelationshipBox.getSelectedItem())) {
+                JOptionPane.showMessageDialog(this,
+                    "Please select a relationship for all heirs.",
+                    "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            String birthdate = entry.heirsBirthdateField.getText().trim();
+            if (!birthdate.isEmpty()) {
+                try { java.sql.Date.valueOf(birthdate); }
+                catch (IllegalArgumentException ex) {
+                    JOptionPane.showMessageDialog(this,
+                        "Birthdate must be in YYYY-MM-DD format.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+            }
+        }
+
+        HeirsDAO dao = new HeirsDAO();
+        dao.deleteAllHeirsByMID(loggedInMid);
+
+        for (HeirEntry entry : entries) {
+            String name         = entry.heirsNameField.getText().trim();
+            String relationship = (String) entry.heirsRelationshipBox.getSelectedItem();
+            String birthdate    = entry.heirsBirthdateField.getText().trim();
+            java.sql.Date birthDate = birthdate.isEmpty() ? null : java.sql.Date.valueOf(birthdate);
+
+            dao.insertHeir(new HeirsTable(loggedInMid, 0, name, relationship, birthDate));
+        }
+
+        JOptionPane.showMessageDialog(this,
+            "Heirs and dependents saved successfully!",
+            "Success", JOptionPane.INFORMATION_MESSAGE);
+        editMode = false;
+        editSaveBtn.setText("Edit");
+        lockAllEntries();
+    }
+
+    // ── Heir Entry ───────────────────────────────────────────────────────────
     public class HeirEntry extends JPanel {
 
         private JLabel numberLabel;
+        private JButton removeBtn;
+
+        public int heirCode; // matches HeirsTable.getHeirCode(), 0 = not yet persisted
 
         public JTextField pagIbigMidNoField;
         public JTextField heirsNameField;
         public JTextField heirsBirthdateField;
         public JComboBox<String> heirsRelationshipBox;
 
-        // Tracks the DB primary key; 0 = unsaved new row
-        public int heirCode = 0;
-
         public HeirEntry(int number, HeirsFormView parent, HeirsTable data) {
             setLayout(new BorderLayout());
             setOpaque(false);
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 230));
+            setAlignmentX(Component.LEFT_ALIGNMENT);
 
             JPanel inner = new JPanel() {
                 @Override
@@ -283,6 +411,8 @@ public class HeirsFormView extends JPanel {
             removeBtn.setContentAreaFilled(false);
             removeBtn.setFocusPainted(false);
             removeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            removeBtn.setVisible(false); // hidden until Edit is clicked
+
             removeBtn.addActionListener(e -> parent.removeEntry(this));
 
             header.add(numberLabel, BorderLayout.WEST);
@@ -294,14 +424,43 @@ public class HeirsFormView extends JPanel {
             fields.setOpaque(false);
 
             JPanel r1 = row(2);
-            r1.add(fieldPanel("PAG-IBIG MID NO.", pagIbigMidNoField  = buildTextField()));
-            r1.add(fieldPanel("HEIR'S NAME",      heirsNameField     = buildTextField()));
+
+            r1.add(fieldPanel(
+                    "PAG-IBIG MID NO.",
+                    pagIbigMidNoField = buildTextField()
+            ));
+            pagIbigMidNoField.setEditable(false);
+            pagIbigMidNoField.setFocusable(false);
+
+            r1.add(fieldPanel(
+                    "HEIR'S NAME",
+                    heirsNameField = buildTextField()
+            ));
+            heirsNameField.setEditable(false);
+            heirsNameField.setFocusable(false);
 
             JPanel r2 = row(2);
-            r2.add(fieldPanel("RELATIONSHIP",     heirsRelationshipBox = buildComboBox(new String[]{
-                    "Select", "Spouse", "Child", "Parent", "Sibling", "Legal Heir", "Other"
-            })));
-            r2.add(fieldPanel("BIRTHDATE (YYYY-MM-DD)", heirsBirthdateField = buildTextField()));
+
+            r2.add(fieldPanel(
+                    "RELATIONSHIP",
+                    heirsRelationshipBox = buildComboBox(new String[]{
+                            "Select",
+                            "Spouse",
+                            "Child",
+                            "Parent",
+                            "Sibling",
+                            "Legal Heir",
+                            "Other"
+                    })
+            ));
+            heirsRelationshipBox.setEnabled(false);
+
+            r2.add(fieldPanel(
+                    "BIRTHDATE (YYYY-MM-DD)",
+                    heirsBirthdateField = buildTextField()
+            ));
+            heirsBirthdateField.setEditable(false);
+            heirsBirthdateField.setFocusable(false);
 
             fields.add(r1);
             fields.add(Box.createRigidArea(new Dimension(0, 16)));
@@ -310,25 +469,10 @@ public class HeirsFormView extends JPanel {
             inner.add(header, BorderLayout.NORTH);
             inner.add(fields, BorderLayout.CENTER);
             add(inner, BorderLayout.CENTER);
+        }
 
-            // ── Populate if data provided ─────────────────────────────────────
-            if (data != null) {
-                heirCode = data.getHeirCode();
-                pagIbigMidNoField.setText(safe(data.getPagIbigMIDNo()));
-                heirsNameField.setText(   safe(data.getHeirsName()));
-                if (data.getHeirsBirthdate() != null)
-                    heirsBirthdateField.setText(data.getHeirsBirthdate().toString());
-                setCombo(heirsRelationshipBox, data.getHeirsRelationship());
-
-                // Pag-IBIG MID is always locked (it's the FK, not user-editable)
-                pagIbigMidNoField.setEditable(false);
-                pagIbigMidNoField.setFocusable(false);
-            } else {
-                // New row — pre-fill MID from parent, lock it
-                if (loggedInMID != null) pagIbigMidNoField.setText(loggedInMID);
-                pagIbigMidNoField.setEditable(false);
-                pagIbigMidNoField.setFocusable(false);
-            }
+        public void setRemoveBtnVisible(boolean visible) {
+            removeBtn.setVisible(visible);
         }
 
         public void updateNumber(int n) {
@@ -404,7 +548,9 @@ public class HeirsFormView extends JPanel {
                 super.paintComponent(g);
             }
         };
-        btn.setPreferredSize(new Dimension(180, 46));
+
+        btn.setPreferredSize(new Dimension(160, 46));
+
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);

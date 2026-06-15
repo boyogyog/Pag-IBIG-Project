@@ -25,7 +25,7 @@ FROM membertable
 WHERE Total_Mo_Income BETWEEN 20000 AND 60000;
 
 -- Moderate (4 Moderate)
--- #4 ESCANILLAS
+-- #4 
 -- The Pag-IBIG compliance office wants to identify companies with significant member enrollment to prioritize them for employer contribution audits. 
 -- Specifically, they need to see companies with active members, along with the average monthly income of their members and the 
 -- total combined monthly income per company, filtering only Filipino citizens with an active employment status.
@@ -40,7 +40,7 @@ GROUP BY cd.Company_Name
 HAVING COUNT(ce.PagIbig_MID_No) >= 1
 ORDER BY Member_Count DESC;
 
--- #5 ESCANILLAS
+-- #5 
 -- The benefits team needs to review members with high dependent counts for insurance coverage assessment. 
 -- List all members along with their spouse and heir count, but only show married members who have declared 
 -- 2 or more heirs to prioritize them for comprehensive insurance coverage review.
@@ -68,7 +68,7 @@ GROUP BY Membership_Type
 HAVING AVG(Total_Mo_Income) >= 200000
 ORDER BY Avg_Monthly_Income DESC;
 
--- #7 RAYO
+-- #7
 -- A Pag-IBIG branch officer needs a report of female members grouped by occupational status whose average monthly income exceeds ₱100,000. 
 -- The report also includes the income range per group to support the regional director's contribution bracket assessment arrange from highest to lowest.
 
@@ -83,9 +83,8 @@ GROUP BY Occupational_Status
 HAVING AVG(Total_Mo_Income) > 100000
 ORDER BY Avg_Monthly_Income DESC;
 
-
 -- Difficult (3 Difficult)
--- #8 ARJONA
+-- #8
 -- The PagIbig Fund office in Pasig City wants to identify which local companies have highly compensated employee groups. 
 -- For each Pasig City company, display their company code, name, address, employment status, total members, total monthly income, 
 -- and average monthly income. Show only groups with an average monthly income exceeding ₱100,000, grouped by company name, address, 
@@ -108,7 +107,7 @@ GROUP BY co.Company_Code, co.Company_Name, co.Company_Address, cu.Employment_Sta
 HAVING AVG(m.Total_Mo_Income) > 100000
 ORDER BY co.Company_Name, Total_Monthly_Income;
 
--- #9 ISIDRO
+-- #9
 -- The HR department wants to recognize employees who are excelling in their first job. 
 -- Display the top earner of each company who has no previous employment record, showing their PagIbig MID No., name, occupation, current company and code, 
 -- total monthly income, and number of heirs. Order by total monthly income descending.
@@ -134,7 +133,7 @@ WHERE m.Total_Mo_Income = (
 GROUP BY m.PagIbig_MID_No,  m.Member_Name, cu.Occupation, co.Company_Code, Company_Name, m.Total_Mo_Income
 ORDER BY m.Total_Mo_Income DESC;
 
--- #10 TAN
+-- #10
 -- The audit team wants a report of all government-sector members currently on record.  
 -- Display their PagIbig MID No., full name, age, sex, marital status, occupation, company name, employment status, 
 -- years in service, and total monthly income. Order by total monthly income highest to lowest.

@@ -42,6 +42,7 @@ public class PrevEmpFormView extends JPanel {
     private void initUI() {
         setLayout(new BorderLayout());
 
+        // ── Gradient Background ───────────────────────────────────────────────
         JPanel bg = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -50,9 +51,10 @@ public class PrevEmpFormView extends JPanel {
                 g2.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        bg.setLayout(new BorderLayout());
+        bg.setLayout(new GridBagLayout());
 
-        JPanel card = new JPanel(new BorderLayout()) {
+        // ── Glass Card ────────────────────────────────────────────────────────
+        JPanel card = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -70,59 +72,90 @@ public class PrevEmpFormView extends JPanel {
             }
         };
         card.setOpaque(false);
+        card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(40, 45, 40, 45));
 
-        // ── Title (NORTH) ─────────────────────────────────────────────────────
-        JPanel titleBlock = new JPanel();
-        titleBlock.setOpaque(false);
-        titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
+        GridBagConstraints cardGbc = new GridBagConstraints();
+        cardGbc.fill    = GridBagConstraints.BOTH;
+        cardGbc.weightx = 1.0;
+        cardGbc.weighty = 1.0;
+        cardGbc.insets  = new Insets(20, 20, 20, 20);
 
+        // ── Content ───────────────────────────────────────────────────────────
+        JPanel content = new JPanel();
+        content.setOpaque(false);
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+
+        // ── Title ─────────────────────────────────────────────────────────────
         JLabel heading = new JLabel("Previous Employment Records");
         heading.setFont(new Font("Arial Black", Font.BOLD, 24));
         heading.setForeground(textWhite);
+        heading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel subHeading = new JLabel("Review your previous employment history.");
         subHeading.setFont(new Font("Arial", Font.PLAIN, 13));
         subHeading.setForeground(new Color(255, 255, 255, 160));
+        subHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        titleBlock.add(heading);
-        titleBlock.add(Box.createVerticalStrut(4));
-        titleBlock.add(subHeading);
-        titleBlock.setBorder(new EmptyBorder(0, 0, 16, 0));
-        card.add(titleBlock, BorderLayout.NORTH);
-
-        // ── List Panel + Scroll (CENTER) ──────────────────────────────────────
-        listPanel = new JPanel();
+        // ── List Panel ────────────────────────────────────────────────────────
+        listPanel = new JPanel() {
+            @Override public boolean getScrollableTracksViewportWidth() {
+                return true; // let the list panel resize to the viewport width
+            }
+        };
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         listPanel.setOpaque(false);
+        listPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        // Leave a little room on the right so content isn't crowded by the scrollbar
+        listPanel.setBorder(new EmptyBorder(0, 0, 0, 10));
 
-        JPanel scrollContent = new JPanel();
-        scrollContent.setOpaque(false);
-        scrollContent.setLayout(new BoxLayout(scrollContent, BoxLayout.Y_AXIS));
-        scrollContent.add(listPanel);
-        scrollContent.add(Box.createVerticalStrut(16));
+        // ── Scroll Pane wrapping the list ────────────────────────────────────
+        JScrollPane scrollPane = new JScrollPane(listPanel);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(null);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+        scrollPane.setPreferredSize(new Dimension(10, 10)); // small base; BoxLayout will stretch it to fill content width
+        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
 
-        JScrollPane scroll = new JScrollPane(scrollContent);
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.setBorder(null);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        card.add(scroll, BorderLayout.CENTER);
-
-        // ── Buttons (SOUTH) ───────────────────────────────────────────────────
+        // ── Buttons ───────────────────────────────────────────────────────────
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         buttonPanel.setOpaque(false);
-        buttonPanel.setBorder(new EmptyBorder(16, 0, 0, 0));
 
         JButton deleteBtn = buildButton("Delete All",  new Color(200, 50, 50));
         JButton returnBtn = buildButton("Back",        accentRed);
+        JButton addBtn    = buildButton("Add Previous Employer", new Color(96, 216, 164));
         editSaveBtn       = buildButton("Edit",        new Color(251, 191, 36));
 
         returnBtn.addActionListener(e -> {
             Window window = SwingUtilities.getWindowAncestor(PrevEmpFormView.this);
             if (window != null) window.dispose();
             new SignInFrame(loggedInMID);
+        });
+
+        addBtn.addActionListener(e -> {
+            if (!editMode) {
+                JOptionPane.showMessageDialog(PrevEmpFormView.this,
+                    "Click Edit before adding a new entry.",
+                    "Edit Mode Required", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            PrevEmpEntry entry = new PrevEmpEntry(entries.size() + 1, loggedInMID,
+                "Select", "", "", 0, this);
+            entry.companyBox.setEnabled(true);
+            entry.fromDateField.setEditable(true);
+            entry.fromDateField.setFocusable(true);
+            entry.toDateField.setEditable(true);
+            entry.toDateField.setFocusable(true);
+            entry.setRemoveBtnVisible(true);
+            entries.add(entry);
+            listPanel.add(entry);
+            listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
+            listPanel.revalidate();
+            listPanel.repaint();
         });
 
         editSaveBtn.addActionListener(e -> {
@@ -153,20 +186,63 @@ public class PrevEmpFormView extends JPanel {
 
         buttonPanel.add(deleteBtn);
         buttonPanel.add(returnBtn);
+        buttonPanel.add(addBtn);
         buttonPanel.add(editSaveBtn);
-        card.add(buttonPanel, BorderLayout.SOUTH);
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JPanel cardWrap = new JPanel(new BorderLayout());
-        cardWrap.setOpaque(false);
-        cardWrap.setBorder(new EmptyBorder(28, 28, 28, 28));
-        cardWrap.add(card, BorderLayout.CENTER);
-        bg.add(cardWrap, BorderLayout.CENTER);
+        // ── Assemble ──────────────────────────────────────────────────────────
+        content.add(heading);
+        content.add(Box.createRigidArea(new Dimension(0, 4)));
+        content.add(subHeading);
+        content.add(Box.createRigidArea(new Dimension(0, 30)));
+        content.add(scrollPane);
+        content.add(Box.createRigidArea(new Dimension(0, 20)));
+        content.add(buttonPanel);
+
+        card.add(content, BorderLayout.CENTER);
+        bg.add(card, cardGbc);
         add(bg, BorderLayout.CENTER);
 
         loadFromDatabase();
     }
 
-    // ── Unlock all entries ────────────────────────────────────────────────────
+    // ── Remove a single entry ─────────────────────────────────────────────────
+    public void removeEntry(PrevEmpEntry entry) {
+        int choice = JOptionPane.showConfirmDialog(this,
+            "Remove this employment record?",
+            "Confirm Remove", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (choice != JOptionPane.YES_OPTION) return;
+
+        // Use existing deletePrevEmp(int) from PrevEmpDAO
+        if (entry.prevEmpCode > 0) {
+            new PrevEmpDAO().deletePrevEmp(entry.prevEmpCode);
+        }
+
+        // Remove from entries list
+        entries.remove(entry);
+
+        // Remove the entry panel and its spacer from listPanel
+        Component[] comps = listPanel.getComponents();
+        for (int i = 0; i < comps.length; i++) {
+            if (comps[i] == entry) {
+                listPanel.remove(i);
+                if (i < listPanel.getComponentCount()) {
+                    listPanel.remove(i); // remove spacer after it
+                }
+                break;
+            }
+        }
+
+        // Renumber remaining entries
+        for (int i = 0; i < entries.size(); i++) {
+            entries.get(i).updateNumber(i + 1);
+        }
+
+        listPanel.revalidate();
+        listPanel.repaint();
+    }
+
+    // ── Unlock all entries for editing ────────────────────────────────────────
     private void unlockAllEntries() {
         for (PrevEmpEntry entry : entries) {
             entry.companyBox.setEnabled(true);
@@ -174,10 +250,11 @@ public class PrevEmpFormView extends JPanel {
             entry.fromDateField.setFocusable(true);
             entry.toDateField.setEditable(true);
             entry.toDateField.setFocusable(true);
+            entry.setRemoveBtnVisible(true);
         }
     }
 
-    // ── Lock all entries ──────────────────────────────────────────────────────
+    // ── Lock all entries after save ───────────────────────────────────────────
     private void lockAllEntries() {
         for (PrevEmpEntry entry : entries) {
             entry.companyBox.setEnabled(false);
@@ -185,12 +262,12 @@ public class PrevEmpFormView extends JPanel {
             entry.fromDateField.setFocusable(false);
             entry.toDateField.setEditable(false);
             entry.toDateField.setFocusable(false);
+            entry.setRemoveBtnVisible(false);
         }
     }
 
     // ── Save ──────────────────────────────────────────────────────────────────
     private void handleSave() {
-        // Validate
         for (PrevEmpEntry entry : entries) {
             if ("Select".equals(entry.companyBox.getSelectedItem())) {
                 JOptionPane.showMessageDialog(this,
@@ -220,7 +297,6 @@ public class PrevEmpFormView extends JPanel {
             }
         }
 
-        // Delete all then re-insert
         PrevEmpDAO dao = new PrevEmpDAO();
         dao.deleteAllPrevEmpByMID(loggedInMID);
 
@@ -247,7 +323,7 @@ public class PrevEmpFormView extends JPanel {
     // ── Load from DB ──────────────────────────────────────────────────────────
     private void loadFromDatabase() {
         if (loggedInMID == null || loggedInMID.isEmpty()) {
-            addEntry(1, "No MID provided", "N/A", "N/A", "N/A");
+            addEntry(1, "No MID provided", "N/A", "N/A", "N/A", 0);
             return;
         }
 
@@ -278,14 +354,16 @@ public class PrevEmpFormView extends JPanel {
 
             addEntry(i + 1, loggedInMID, companyDisplay,
                 rec.getFromDate() != null ? rec.getFromDate().toString() : "",
-                rec.getToDate()   != null ? rec.getToDate().toString()   : "");
+                rec.getToDate()   != null ? rec.getToDate().toString()   : "",
+                rec.getPrevEmpCode()); // ← correct getter from PrevEmpTable
         }
 
-        lockAllEntries(); // start locked
+        lockAllEntries();
     }
 
-    private void addEntry(int number, String mid, String company, String from, String to) {
-        PrevEmpEntry entry = new PrevEmpEntry(number, mid, company, from, to);
+    private void addEntry(int number, String mid, String company,
+                          String from, String to, int prevEmpCode) {
+        PrevEmpEntry entry = new PrevEmpEntry(number, mid, company, from, to, prevEmpCode, this);
         entries.add(entry);
         listPanel.add(entry);
         listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
@@ -296,12 +374,20 @@ public class PrevEmpFormView extends JPanel {
     // ── Entry Card ────────────────────────────────────────────────────────────
     public class PrevEmpEntry extends JPanel {
 
-        public JTextField      pagIbigMidNoField;
-        public JComboBox<String> companyBox;
-        public JTextField      fromDateField;
-        public JTextField      toDateField;
+        private JLabel           numberLabel;
+        private JButton          removeBtn;
 
-        public PrevEmpEntry(int number, String mid, String company, String from, String to) {
+        public int               prevEmpCode; // matches PrevEmpTable.getPrevEmpCode()
+        public JTextField        pagIbigMidNoField;
+        public JComboBox<String> companyBox;
+        public JTextField        fromDateField;
+        public JTextField        toDateField;
+
+        public PrevEmpEntry(int number, String mid, String company,
+                            String from, String to, int prevEmpCode,
+                            PrevEmpFormView parent) {
+            this.prevEmpCode = prevEmpCode;
+
             setLayout(new BorderLayout());
             setOpaque(false);
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
@@ -322,16 +408,34 @@ public class PrevEmpFormView extends JPanel {
             inner.setOpaque(false);
             inner.setBorder(new EmptyBorder(18, 20, 18, 20));
 
-            JLabel numberLabel = new JLabel("Previous Employer " + number);
+            // ── Header: label + Remove button ─────────────────────────────────
+            JPanel header = new JPanel(new BorderLayout());
+            header.setOpaque(false);
+
+            numberLabel = new JLabel("Previous Employer " + number);
             numberLabel.setFont(new Font("Arial Black", Font.BOLD, 13));
             numberLabel.setForeground(accentGreen);
-            inner.add(numberLabel, BorderLayout.NORTH);
 
+            removeBtn = new JButton("✕ Remove");
+            removeBtn.setForeground(new Color(255, 120, 120));
+            removeBtn.setFont(new Font("Arial", Font.BOLD, 12));
+            removeBtn.setBorderPainted(false);
+            removeBtn.setContentAreaFilled(false);
+            removeBtn.setFocusPainted(false);
+            removeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            removeBtn.setVisible(false); // hidden until Edit is clicked
+            removeBtn.addActionListener(e -> parent.removeEntry(this));
+
+            header.add(numberLabel, BorderLayout.WEST);
+            header.add(removeBtn,   BorderLayout.EAST);
+            inner.add(header, BorderLayout.NORTH);
+
+            // ── Fields ────────────────────────────────────────────────────────
             JPanel fields = new JPanel();
             fields.setLayout(new BoxLayout(fields, BoxLayout.Y_AXIS));
             fields.setOpaque(false);
 
-            // Row 1: MID + Company dropdown
+            // Row 1: MID + Company
             JPanel r1 = row(2);
             r1.add(fieldPanel("PAG-IBIG MID NO.", pagIbigMidNoField = buildTextField(mid)));
 
@@ -339,9 +443,9 @@ public class PrevEmpFormView extends JPanel {
             companyBox.setFont(new Font("Arial", Font.PLAIN, 14));
             companyBox.setForeground(Color.WHITE);
             companyBox.setBackground(new Color(25, 35, 60));
-            companyBox.setEnabled(false); // locked by default
+            companyBox.setPrototypeDisplayValue("Select"); // prevent long company names from widening the layout
+            companyBox.setEnabled(false);
 
-            // Pre-select matching company
             for (int i = 0; i < companyBox.getItemCount(); i++) {
                 if (companyBox.getItemAt(i).contains(company)) {
                     companyBox.setSelectedIndex(i);
@@ -350,7 +454,7 @@ public class PrevEmpFormView extends JPanel {
             }
             r1.add(fieldPanel("COMPANY", companyBox));
 
-            // Row 2: From/To dates
+            // Row 2: From / To dates
             JPanel r2 = row(2);
             r2.add(fieldPanel("FROM DATE (YYYY-MM-DD)", fromDateField = buildTextField(from)));
             r2.add(fieldPanel("TO DATE (YYYY-MM-DD)",   toDateField   = buildTextField(to)));
@@ -360,6 +464,14 @@ public class PrevEmpFormView extends JPanel {
             fields.add(r2);
             inner.add(fields, BorderLayout.CENTER);
             add(inner, BorderLayout.CENTER);
+        }
+
+        public void updateNumber(int n) {
+            numberLabel.setText("Previous Employer " + n);
+        }
+
+        public void setRemoveBtnVisible(boolean visible) {
+            removeBtn.setVisible(visible);
         }
     }
 
@@ -416,13 +528,16 @@ public class PrevEmpFormView extends JPanel {
                 super.paintComponent(g);
             }
         };
-        btn.setPreferredSize(new Dimension(160, 46));
+        btn.setFont(new Font("Arial Black", Font.BOLD, 13));
+        FontMetrics fm = btn.getFontMetrics(btn.getFont());
+        int textWidth = fm.stringWidth(text);
+        int width = Math.max(160, textWidth + 48);
+        btn.setPreferredSize(new Dimension(width, 46));
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
         btn.setOpaque(false);
         btn.setForeground(new Color(10, 22, 40));
-        btn.setFont(new Font("Arial Black", Font.BOLD, 13));
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         return btn;
     }
@@ -449,7 +564,7 @@ public class PrevEmpFormView extends JPanel {
         SwingUtilities.invokeLater(() -> {
             JFrame f = new JFrame("Previous Employment Form View");
             f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            f.setSize(1100, 700);
+            f.setSize(1200, 850);
             f.setLocationRelativeTo(null);
             f.setContentPane(new PrevEmpFormView());
             f.setVisible(true);
