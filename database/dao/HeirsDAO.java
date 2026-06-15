@@ -36,6 +36,19 @@ public class HeirsDAO {
             return false;
         }
     }
+    
+    public boolean deleteHeirsByMID(String pagIbigMIDNo) {
+        String sql = "DELETE FROM heirstable WHERE PagIbig_MID_No = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, pagIbigMIDNo);
+            ps.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            System.err.println("[HeirsDAO] deleteHeirsByMID error: " + e.getMessage());
+            return false;
+        }
+    }
 
     // ─── READ (all heirs of one member) ──────────────────────────────────────────
 

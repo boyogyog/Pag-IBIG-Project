@@ -32,10 +32,11 @@ public class HeirsFormView extends JPanel {
         initUI();
     }
 
-    public HeirsFormView() {
-        this.loggedInMID = null;
-        initUI();
-    }
+    // ── Logged-in member's MID (set from session) ────────────────────────────
+    private final String loggedInMid;
+
+    public HeirsFormView(String loggedInMid) {
+        this.loggedInMid = (loggedInMid != null) ? loggedInMid : "";
 
     // ── Init ─────────────────────────────────────────────────────────────────
     private void initUI() {
@@ -122,10 +123,17 @@ public class HeirsFormView extends JPanel {
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         buttonPanel.setOpaque(false);
-        buttonPanel.setBorder(new EmptyBorder(18, 0, 0, 0));
-        buttonPanel.add(addBtn);
-        buttonPanel.add(saveBtn);
-        buttonPanel.add(backBtn);
+
+        JButton returnBtn = buildButton("Back", accentRed);
+
+        returnBtn.addActionListener(e -> {
+    	    Window window = SwingUtilities.getWindowAncestor(HeirsFormView.this);
+    	    if (window != null) window.dispose();
+    	    new SignInFrame(loggedInMid); // go back to the dashboard
+    	});
+
+        buttonPanel.add(returnBtn);
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         // ── Content wrapper ───────────────────────────────────────────────────
         JPanel content = new JPanel(new BorderLayout());
@@ -140,143 +148,53 @@ public class HeirsFormView extends JPanel {
         bg.add(card);
         add(bg, BorderLayout.CENTER);
 
-        // ── Load data ─────────────────────────────────────────────────────────
-        if (loggedInMID != null && !loggedInMID.isEmpty()) {
-            loadHeirsFromDB(loggedInMID);
-        } else {
-            addEntry(null); // start with one blank entry for fallback/dummy
-            loadDummyData();
-        }
+        // ── Load real heirs from DB ──────────────────────────────────────────
+        loadFromDatabase();
     }
 
-    // ── Load from DB ──────────────────────────────────────────────────────────
-    private void loadHeirsFromDB(String mid) {
+    // ── Load heirs from DB for this MID ──────────────────────────────────────
+    private void loadFromDatabase() {
+        System.out.println("Loading heirs for MID: " + loggedInMid); // debug
         HeirsDAO dao = new HeirsDAO();
-        List<HeirsTable> heirsList = dao.getHeirsByMID(mid);
+        List<HeirsTable> saved = dao.getHeirsByMID(loggedInMid);
 
-        if (heirsList.isEmpty()) {
-            // No heirs yet — give one blank entry to fill in
-            addEntry(null);
+        if (saved.isEmpty()) {
+            // No saved heirs yet — start with one blank entry
+            addEntry();
         } else {
-            for (HeirsTable h : heirsList) {
-                addEntry(h);
+            for (HeirsTable heir : saved) {
+                heirCount++;
+                HeirEntry entry = new HeirEntry(heirCount, this);
+                entry.pagIbigMidNoField.setText(loggedInMid);
+                entry.pagIbigMidNoField.setEditable(false);
+                entry.pagIbigMidNoField.setFocusable(false);
+                entry.heirsNameField.setText(heir.getHeirsName());
+                entry.heirsRelationshipBox.setSelectedItem(heir.getHeirsRelationship());
+                entry.heirsBirthdateField.setText(
+                    heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
+                entries.add(entry);
+                listPanel.add(entry);
+                listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
             }
+            listPanel.revalidate();
+            listPanel.repaint();
         }
     }
-
-    // ── Save all heirs to DB ──────────────────────────────────────────────────
-    private void saveAllHeirs() {
-        if (loggedInMID == null || loggedInMID.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                "Cannot save: no member MID loaded.",
-                "Save Error", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        try {
-            HeirsDAO dao = new HeirsDAO();
-            int successCount = 0;
-            int failCount    = 0;
-
-            for (HeirEntry entry : entries) {
-                String name         = entry.heirsNameField.getText().trim();
-                String relationship = (String) entry.heirsRelationshipBox.getSelectedItem();
-                String bdText       = entry.heirsBirthdateField.getText().trim();
-
-                if (name.isEmpty()) continue; // skip blank rows
-
-                Date birthdate = null;
-                if (!bdText.isEmpty()) {
-                    try {
-                        birthdate = Date.valueOf(bdText);
-                    } catch (IllegalArgumentException ex) {
-                        JOptionPane.showMessageDialog(this,
-                            "Invalid date for heir \"" + name + "\". Use YYYY-MM-DD format.",
-                            "Validation Error", JOptionPane.ERROR_MESSAGE);
-                        return;
-                    }
-                }
-
-                HeirsTable h = new HeirsTable(
-                    loggedInMID,
-                    entry.heirCode,   // 0 = new record, >0 = existing
-                    name,
-                    "Select".equals(relationship) ? null : relationship,
-                    birthdate
-                );
-
-                boolean ok;
-                if (entry.heirCode > 0) {
-                    ok = dao.updateHeir(h);
-                } else {
-                    ok = dao.insertHeir(h);
-                }
-
-                if (ok) successCount++;
-                else    failCount++;
-            }
-
-            if (failCount == 0) {
-                JOptionPane.showMessageDialog(this,
-                    successCount + " heir record(s) saved successfully.",
-                    "Saved", JOptionPane.INFORMATION_MESSAGE);
-                // Reload to get DB-assigned Heir_Codes for new rows
-                reloadAfterSave();
-            } else {
-                JOptionPane.showMessageDialog(this,
-                    successCount + " saved, " + failCount + " failed.",
-                    "Partial Save", JOptionPane.WARNING_MESSAGE);
-            }
-
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                "An error occurred while saving:\n" + ex.getMessage(),
-                "Save Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // ── Reload entries after save (refreshes heirCodes) ──────────────────────
-    private void reloadAfterSave() {
-        entries.clear();
-        listPanel.removeAll();
-        heirCount = 0;
-        if (loggedInMID != null) loadHeirsFromDB(loggedInMID);
-        listPanel.revalidate();
-        listPanel.repaint();
-    }
-
-    // ── Add entry with optional DB data ──────────────────────────────────────
-    public void addEntry(HeirsTable data) {
+    public void addEntry() {
         heirCount++;
-        HeirEntry entry = new HeirEntry(heirCount, this, data);
+
+        HeirEntry entry = new HeirEntry(heirCount, this);
+
+        // Auto-fill MID from logged-in session and lock it — not user-editable
+        entry.pagIbigMidNoField.setText(loggedInMid);
+        entry.pagIbigMidNoField.setEditable(false);
+        entry.pagIbigMidNoField.setFocusable(false);
+
         entries.add(entry);
         listPanel.add(entry);
         listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
         listPanel.revalidate();
         listPanel.repaint();
-    }
-
-    // ── Add blank new entry (for Add Heir button) ─────────────────────────────
-    public void addNewEntry() {
-        addEntry(null);
-        // Scroll to bottom
-        SwingUtilities.invokeLater(() -> {
-            JScrollPane sp = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, listPanel);
-            if (sp != null) {
-                JScrollBar sb = sp.getVerticalScrollBar();
-                sb.setValue(sb.getMaximum());
-            }
-        });
-    }
-
-    // ── Dummy data fallback ───────────────────────────────────────────────────
-    private void loadDummyData() {
-        if (entries.isEmpty()) return;
-        HeirEntry h1 = entries.get(0);
-        h1.pagIbigMidNoField.setText("1234-5678-9012");
-        h1.heirsNameField.setText("Dela Cruz, Maria Santos");
-        h1.heirsBirthdateField.setText("1998-05-21");
-        h1.heirsRelationshipBox.setSelectedItem("Spouse");
     }
 
     // ── Remove entry ──────────────────────────────────────────────────────────
@@ -524,7 +442,9 @@ public class HeirsFormView extends JPanel {
             f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             f.setSize(1200, 850);
             f.setLocationRelativeTo(null);
-            f.setContentPane(new HeirsFormView());
+
+            f.setContentPane(new HeirsFormView("0000-0000-0000"));
+
             f.setVisible(true);
         });
     }

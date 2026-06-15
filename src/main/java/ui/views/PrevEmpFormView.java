@@ -1,12 +1,16 @@
 package ui.views;
 
+import dao.CompanyDAO;
 import dao.PrevEmpDAO;
+import models.CompanyDetailsTable;
 import models.PrevEmpTable;
 import ui.frames.SignInFrame;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.sql.Date;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,15 +22,24 @@ public class PrevEmpFormView extends JPanel {
     private final Color accentRed   = new Color(255, 99, 132);
     private final Color textWhite   = Color.WHITE;
 
-    private JPanel listPanel;
-    public List<PrevEmpEntry> entries = new ArrayList<>();
-
+    private JButton  editSaveBtn;
+    private boolean  editMode = false;
+    private List<CompanyDetailsTable> companyList;
+    private JPanel   listPanel;
     private final String loggedInMID;
-
-    public PrevEmpFormView() { this(null); }
+    public  List<PrevEmpEntry> entries = new ArrayList<>();
 
     public PrevEmpFormView(String mid) {
         this.loggedInMID = mid;
+        initUI();
+    }
+
+    public PrevEmpFormView() {
+        this.loggedInMID = null;
+        initUI();
+    }
+
+    private void initUI() {
         setLayout(new BorderLayout());
 
         JPanel bg = new JPanel() {
@@ -37,188 +50,242 @@ public class PrevEmpFormView extends JPanel {
                 g2.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        bg.setLayout(new GridBagLayout());
+        bg.setLayout(new BorderLayout());
 
-        JPanel card = new JPanel() {
+        JPanel card = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(new Color(0, 0, 0, 40));
-                g2.fillRoundRect(4, 8, getWidth() - 8, getHeight() - 8, 24, 24);
+                g2.fillRoundRect(4, 8, getWidth()-8, getHeight()-8, 24, 24);
                 g2.setColor(new Color(255, 255, 255, 18));
-                g2.fillRoundRect(0, 0, getWidth() - 4, getHeight() - 4, 24, 24);
+                g2.fillRoundRect(0, 0, getWidth()-4, getHeight()-4, 24, 24);
                 g2.setColor(new Color(255, 255, 255, 45));
-                g2.drawRoundRect(0, 0, getWidth() - 5, getHeight() - 5, 24, 24);
+                g2.drawRoundRect(0, 0, getWidth()-5, getHeight()-5, 24, 24);
                 g2.setColor(accentGreen);
                 g2.setStroke(new BasicStroke(2.5f));
-                g2.drawLine(16, 0, getWidth() - 20, 0);
+                g2.drawLine(16, 0, getWidth()-20, 0);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
         card.setOpaque(false);
-        card.setPreferredSize(new Dimension(980, 620));
-        card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(40, 45, 40, 45));
 
-        JPanel content = new JPanel();
-        content.setOpaque(false);
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        // ── Title (NORTH) ─────────────────────────────────────────────────────
+        JPanel titleBlock = new JPanel();
+        titleBlock.setOpaque(false);
+        titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
 
         JLabel heading = new JLabel("Previous Employment Records");
         heading.setFont(new Font("Arial Black", Font.BOLD, 24));
         heading.setForeground(textWhite);
-        heading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subHeading = new JLabel("Review and update your previous employment history.");
+        JLabel subHeading = new JLabel("Review your previous employment history.");
         subHeading.setFont(new Font("Arial", Font.PLAIN, 13));
         subHeading.setForeground(new Color(255, 255, 255, 160));
-        subHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+        titleBlock.add(heading);
+        titleBlock.add(Box.createVerticalStrut(4));
+        titleBlock.add(subHeading);
+        titleBlock.setBorder(new EmptyBorder(0, 0, 16, 0));
+        card.add(titleBlock, BorderLayout.NORTH);
+
+        // ── List Panel + Scroll (CENTER) ──────────────────────────────────────
         listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         listPanel.setOpaque(false);
-        listPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // ── Buttons ──────────────────────────────────────────────────────────
+        JPanel scrollContent = new JPanel();
+        scrollContent.setOpaque(false);
+        scrollContent.setLayout(new BoxLayout(scrollContent, BoxLayout.Y_AXIS));
+        scrollContent.add(listPanel);
+        scrollContent.add(Box.createVerticalStrut(16));
+
+        JScrollPane scroll = new JScrollPane(scrollContent);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        card.add(scroll, BorderLayout.CENTER);
+
+        // ── Buttons (SOUTH) ───────────────────────────────────────────────────
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         buttonPanel.setOpaque(false);
-        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        buttonPanel.setBorder(new EmptyBorder(16, 0, 0, 0));
 
-        JButton saveBtn = buildButton("Save", accentGreen);
-        saveBtn.addActionListener(e -> saveAllEntries());
+        JButton deleteBtn = buildButton("Delete All",  new Color(200, 50, 50));
+        JButton returnBtn = buildButton("Back",        accentRed);
+        editSaveBtn       = buildButton("Edit",        new Color(251, 191, 36));
 
-        JButton returnBtn = buildButton("Back", accentRed);
         returnBtn.addActionListener(e -> {
             Window window = SwingUtilities.getWindowAncestor(PrevEmpFormView.this);
             if (window != null) window.dispose();
             new SignInFrame(loggedInMID);
         });
 
-        buttonPanel.add(saveBtn);
+        editSaveBtn.addActionListener(e -> {
+            if (!editMode) {
+                editMode = true;
+                editSaveBtn.setText("Save Changes");
+                unlockAllEntries();
+            } else {
+                handleSave();
+            }
+        });
+
+        deleteBtn.addActionListener(e -> {
+            int choice = JOptionPane.showConfirmDialog(PrevEmpFormView.this,
+                "Delete all previous employment records? This cannot be undone.",
+                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (choice != JOptionPane.YES_OPTION) return;
+            new PrevEmpDAO().deleteAllPrevEmpByMID(loggedInMID);
+            JOptionPane.showMessageDialog(PrevEmpFormView.this,
+                "All previous employment records deleted.");
+            entries.clear();
+            listPanel.removeAll();
+            listPanel.revalidate();
+            listPanel.repaint();
+            editMode = false;
+            editSaveBtn.setText("Edit");
+        });
+
+        buttonPanel.add(deleteBtn);
         buttonPanel.add(returnBtn);
+        buttonPanel.add(editSaveBtn);
+        card.add(buttonPanel, BorderLayout.SOUTH);
 
-        content.add(heading);
-        content.add(Box.createRigidArea(new Dimension(0, 4)));
-        content.add(subHeading);
-        content.add(Box.createRigidArea(new Dimension(0, 30)));
-        content.add(listPanel);
-        content.add(Box.createRigidArea(new Dimension(0, 25)));
-        content.add(buttonPanel);
-
-        JScrollPane scrollPane = new JScrollPane(content);
-        scrollPane.setBorder(null);
-        scrollPane.setOpaque(false);
-        scrollPane.getViewport().setOpaque(false);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(8, Integer.MAX_VALUE));
-        scrollPane.getVerticalScrollBar().setBackground(new Color(0, 0, 0, 0));
-
-        card.add(scrollPane, BorderLayout.CENTER);
-        bg.add(card);
+        JPanel cardWrap = new JPanel(new BorderLayout());
+        cardWrap.setOpaque(false);
+        cardWrap.setBorder(new EmptyBorder(28, 28, 28, 28));
+        cardWrap.add(card, BorderLayout.CENTER);
+        bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
-        loadDataFromDB();
+        loadFromDatabase();
     }
 
-    // ── Load from DB ──────────────────────────────────────────────────────────
-    private void loadDataFromDB() {
-        if (loggedInMID == null || loggedInMID.isEmpty()) {
-            showNoRecordMessage();
-            return;
-        }
-        PrevEmpDAO dao = new PrevEmpDAO();
-        List<PrevEmpTable> records = dao.getPrevEmpByMID(loggedInMID);
-
-        if (records == null || records.isEmpty()) {
-            showNoRecordMessage();
-            return;
-        }
-        for (PrevEmpTable record : records) {
-            addEntry(record);
-        }
-    }
-
-    // ── Save ALL entries back to DB ───────────────────────────────────────────
-    private void saveAllEntries() {
-        if (loggedInMID == null || loggedInMID.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                "Cannot save: no member ID is loaded.",
-                "Save Error", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        PrevEmpDAO dao = new PrevEmpDAO();
-        int successCount = 0;
-        int failCount    = 0;
-
+    // ── Unlock all entries ────────────────────────────────────────────────────
+    private void unlockAllEntries() {
         for (PrevEmpEntry entry : entries) {
-            try {
-                PrevEmpTable record = new PrevEmpTable(
-                    loggedInMID,
-                    entry.prevEmpCode,
-                    entry.companyCodeField.getText().trim(),
-                    parseDate(entry.toDateField.getText().trim()),
-                    parseDate(entry.fromDateField.getText().trim())
-                );
+            entry.companyBox.setEnabled(true);
+            entry.fromDateField.setEditable(true);
+            entry.fromDateField.setFocusable(true);
+            entry.toDateField.setEditable(true);
+            entry.toDateField.setFocusable(true);
+        }
+    }
 
-                if (dao.updatePrevEmp(record)) {
-                    successCount++;
-                } else {
-                    failCount++;
-                }
+    // ── Lock all entries ──────────────────────────────────────────────────────
+    private void lockAllEntries() {
+        for (PrevEmpEntry entry : entries) {
+            entry.companyBox.setEnabled(false);
+            entry.fromDateField.setEditable(false);
+            entry.fromDateField.setFocusable(false);
+            entry.toDateField.setEditable(false);
+            entry.toDateField.setFocusable(false);
+        }
+    }
 
-            } catch (IllegalArgumentException ex) {
-                failCount++;
+    // ── Save ──────────────────────────────────────────────────────────────────
+    private void handleSave() {
+        // Validate
+        for (PrevEmpEntry entry : entries) {
+            if ("Select".equals(entry.companyBox.getSelectedItem())) {
                 JOptionPane.showMessageDialog(this,
-                    "Invalid date in entry \"" + entry.getTitle() + "\".\n"
-                    + "Please use YYYY-MM-DD format.",
-                    "Validation Error", JOptionPane.ERROR_MESSAGE);
-                return; // stop on first validation error
+                    "Please select a company for all entries.",
+                    "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            String from = entry.fromDateField.getText().trim();
+            String to   = entry.toDateField.getText().trim();
+            if (!from.isEmpty()) {
+                try { java.sql.Date.valueOf(from); }
+                catch (IllegalArgumentException ex) {
+                    JOptionPane.showMessageDialog(this,
+                        "From Date must be in YYYY-MM-DD format.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+            }
+            if (!to.isEmpty()) {
+                try { java.sql.Date.valueOf(to); }
+                catch (IllegalArgumentException ex) {
+                    JOptionPane.showMessageDialog(this,
+                        "To Date must be in YYYY-MM-DD format.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
             }
         }
 
-        if (failCount == 0) {
-            JOptionPane.showMessageDialog(this,
-                successCount + " record(s) updated successfully.",
-                "Saved", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this,
-                successCount + " record(s) saved, " + failCount + " failed.",
-                "Partial Save", JOptionPane.WARNING_MESSAGE);
+        // Delete all then re-insert
+        PrevEmpDAO dao = new PrevEmpDAO();
+        dao.deleteAllPrevEmpByMID(loggedInMID);
+
+        for (PrevEmpEntry entry : entries) {
+            String selected    = (String) entry.companyBox.getSelectedItem();
+            String companyCode = selected.substring(
+                selected.lastIndexOf("(") + 1, selected.lastIndexOf(")"));
+            String from = entry.fromDateField.getText().trim();
+            String to   = entry.toDateField.getText().trim();
+            java.sql.Date fromDate = from.isEmpty() ? null : java.sql.Date.valueOf(from);
+            java.sql.Date toDate   = to.isEmpty()   ? null : java.sql.Date.valueOf(to);
+
+            dao.insertPrevEmp(new PrevEmpTable(loggedInMID, 0, companyCode, toDate, fromDate));
         }
+
+        JOptionPane.showMessageDialog(this,
+            "Previous employment records saved successfully!",
+            "Success", JOptionPane.INFORMATION_MESSAGE);
+        editMode = false;
+        editSaveBtn.setText("Edit");
+        lockAllEntries();
     }
 
-    // ── Parse date safely ─────────────────────────────────────────────────────
-    private Date parseDate(String text) {
-        if (text == null || text.isEmpty() || text.equals("N/A")) return null;
-        return Date.valueOf(text); // throws IllegalArgumentException if invalid
+    // ── Load from DB ──────────────────────────────────────────────────────────
+    private void loadFromDatabase() {
+        if (loggedInMID == null || loggedInMID.isEmpty()) {
+            addEntry(1, "No MID provided", "N/A", "N/A", "N/A");
+            return;
+        }
+
+        companyList = new CompanyDAO().getAllCompanies();
+
+        PrevEmpDAO dao = new PrevEmpDAO();
+        List<PrevEmpTable> records = dao.getPrevEmpByMID(loggedInMID);
+
+        if (records.isEmpty()) {
+            JLabel noData = new JLabel("No previous employment records found.");
+            noData.setForeground(new Color(255, 255, 255, 150));
+            noData.setFont(new Font("Arial", Font.ITALIC, 14));
+            noData.setAlignmentX(Component.LEFT_ALIGNMENT);
+            listPanel.add(noData);
+            return;
+        }
+
+        for (int i = 0; i < records.size(); i++) {
+            PrevEmpTable rec = records.get(i);
+
+            String companyDisplay = rec.getCompanyCode();
+            for (CompanyDetailsTable c : companyList) {
+                if (c.getCompanyCode().equals(rec.getCompanyCode())) {
+                    companyDisplay = c.getCompanyName() + " (" + c.getCompanyCode() + ")";
+                    break;
+                }
+            }
+
+            addEntry(i + 1, loggedInMID, companyDisplay,
+                rec.getFromDate() != null ? rec.getFromDate().toString() : "",
+                rec.getToDate()   != null ? rec.getToDate().toString()   : "");
+        }
+
+        lockAllEntries(); // start locked
     }
 
-    // ── Show placeholder when no records found ────────────────────────────────
-    private void showNoRecordMessage() {
-        JLabel noRecord = new JLabel("No previous employment records found.");
-        noRecord.setFont(new Font("Arial", Font.ITALIC, 14));
-        noRecord.setForeground(new Color(255, 255, 255, 160));
-        noRecord.setAlignmentX(Component.LEFT_ALIGNMENT);
-        listPanel.add(noRecord);
-        listPanel.revalidate();
-        listPanel.repaint();
-    }
-
-    // ── Add Entry (from DB record) ────────────────────────────────────────────
-    public void addEntry(PrevEmpTable record) {
-        String fromDate = record.getFromDate() != null ? record.getFromDate().toString() : "N/A";
-        String toDate   = record.getToDate()   != null ? record.getToDate().toString()   : "N/A";
-
-        PrevEmpEntry entry = new PrevEmpEntry(
-            entries.size() + 1,
-            record.getPrevEmpCode(),
-            record.getPagIbigMIDNo(),
-            record.getCompanyCode(),
-            fromDate,
-            toDate
-        );
+    private void addEntry(int number, String mid, String company, String from, String to) {
+        PrevEmpEntry entry = new PrevEmpEntry(number, mid, company, from, to);
         entries.add(entry);
         listPanel.add(entry);
         listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
@@ -229,96 +296,97 @@ public class PrevEmpFormView extends JPanel {
     // ── Entry Card ────────────────────────────────────────────────────────────
     public class PrevEmpEntry extends JPanel {
 
-        public final int    prevEmpCode;           // needed for UPDATE WHERE clause
-        public JTextField   pagIbigMidNoField;     // locked
-        public JTextField   companyCodeField;      // editable
-        public JTextField   fromDateField;         // editable
-        public JTextField   toDateField;           // editable
-        private final String entryTitle;
+        public JTextField      pagIbigMidNoField;
+        public JComboBox<String> companyBox;
+        public JTextField      fromDateField;
+        public JTextField      toDateField;
 
-        public String getTitle() { return entryTitle; }
-
-        public PrevEmpEntry(int number, int prevEmpCode,
-                            String pagibig, String company,
-                            String from,   String to) {
-            this.prevEmpCode = prevEmpCode;
-            this.entryTitle  = "Previous Employer " + number;
-
+        public PrevEmpEntry(int number, String mid, String company, String from, String to) {
             setLayout(new BorderLayout());
             setOpaque(false);
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
             setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            JPanel inner = new JPanel() {
+            JPanel inner = new JPanel(new BorderLayout(0, 15)) {
                 @Override protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                            RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     g2.setColor(new Color(255, 255, 255, 12));
-                    g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 18, 18);
+                    g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 18, 18);
                     g2.setColor(new Color(255, 255, 255, 35));
-                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 18, 18);
+                    g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 18, 18);
                     g2.dispose();
                     super.paintComponent(g);
                 }
             };
             inner.setOpaque(false);
-            inner.setLayout(new BorderLayout(0, 15));
             inner.setBorder(new EmptyBorder(18, 20, 18, 20));
 
-            JPanel header = new JPanel(new BorderLayout());
-            header.setOpaque(false);
-            JLabel numberLabel = new JLabel(entryTitle);
+            JLabel numberLabel = new JLabel("Previous Employer " + number);
             numberLabel.setFont(new Font("Arial Black", Font.BOLD, 13));
             numberLabel.setForeground(accentGreen);
-            header.add(numberLabel, BorderLayout.WEST);
+            inner.add(numberLabel, BorderLayout.NORTH);
 
             JPanel fields = new JPanel();
             fields.setLayout(new BoxLayout(fields, BoxLayout.Y_AXIS));
             fields.setOpaque(false);
 
+            // Row 1: MID + Company dropdown
             JPanel r1 = row(2);
-            // PAG-IBIG MID NO. — locked, not editable
-            pagIbigMidNoField = buildTextField(pagibig, false);
-            r1.add(fieldPanel("PAG-IBIG MID NO.", pagIbigMidNoField));
-            // COMPANY CODE — editable
-            companyCodeField  = buildTextField(company, true);
-            r1.add(fieldPanel("COMPANY CODE",     companyCodeField));
+            r1.add(fieldPanel("PAG-IBIG MID NO.", pagIbigMidNoField = buildTextField(mid)));
 
+            companyBox = new JComboBox<>(buildCompanyItems());
+            companyBox.setFont(new Font("Arial", Font.PLAIN, 14));
+            companyBox.setForeground(Color.WHITE);
+            companyBox.setBackground(new Color(25, 35, 60));
+            companyBox.setEnabled(false); // locked by default
+
+            // Pre-select matching company
+            for (int i = 0; i < companyBox.getItemCount(); i++) {
+                if (companyBox.getItemAt(i).contains(company)) {
+                    companyBox.setSelectedIndex(i);
+                    break;
+                }
+            }
+            r1.add(fieldPanel("COMPANY", companyBox));
+
+            // Row 2: From/To dates
             JPanel r2 = row(2);
-            // DATE fields — editable
-            fromDateField = buildTextField(from, true);
-            r2.add(fieldPanel("FROM DATE (YYYY-MM-DD)", fromDateField));
-            toDateField   = buildTextField(to,   true);
-            r2.add(fieldPanel("TO DATE (YYYY-MM-DD)",   toDateField));
+            r2.add(fieldPanel("FROM DATE (YYYY-MM-DD)", fromDateField = buildTextField(from)));
+            r2.add(fieldPanel("TO DATE (YYYY-MM-DD)",   toDateField   = buildTextField(to)));
 
             fields.add(r1);
             fields.add(Box.createRigidArea(new Dimension(0, 16)));
             fields.add(r2);
-
-            inner.add(header, BorderLayout.NORTH);
             inner.add(fields, BorderLayout.CENTER);
             add(inner, BorderLayout.CENTER);
         }
     }
 
-    // ── Styled TextField — editable flag ──────────────────────────────────────
-    private JTextField buildTextField(String value, boolean editable) {
+    // ── UI Helpers ────────────────────────────────────────────────────────────
+    private String[] buildCompanyItems() {
+        if (companyList == null) companyList = new CompanyDAO().getAllCompanies();
+        String[] items = new String[companyList.size() + 1];
+        items[0] = "Select";
+        for (int i = 0; i < companyList.size(); i++) {
+            CompanyDetailsTable c = companyList.get(i);
+            items[i + 1] = c.getCompanyName() + " (" + c.getCompanyCode() + ")";
+        }
+        return items;
+    }
+
+    private JTextField buildTextField(String value) {
         JTextField field = new JTextField(value) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                        RenderingHints.VALUE_ANTIALIAS_ON);
-                // slightly brighter background for editable fields
-                g2.setColor(editable
-                        ? new Color(255, 255, 255, 25)
-                        : new Color(255, 255, 255, 15));
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(255, 255, 255, 15));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-                g2.setColor(editable
-                        ? new Color(96, 216, 164, 80)   // green tint border for editable
+                g2.setColor(isFocusOwner()
+                        ? new Color(96, 216, 164, 180)
                         : new Color(255, 255, 255, 50));
                 g2.setStroke(new BasicStroke(1.5f));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -328,26 +396,27 @@ public class PrevEmpFormView extends JPanel {
         field.setCaretColor(Color.WHITE);
         field.setFont(new Font("Arial", Font.PLAIN, 14));
         field.setBorder(new EmptyBorder(10, 14, 10, 14));
-        field.setEditable(editable);
-        field.setFocusable(editable);
+        field.setEditable(false);
+        field.setFocusable(false);
+        field.addFocusListener(new FocusAdapter() {
+            public void focusGained(FocusEvent e) { field.repaint(); }
+            public void focusLost(FocusEvent e)   { field.repaint(); }
+        });
         return field;
     }
 
-    // ── Styled Button ─────────────────────────────────────────────────────────
     private JButton buildButton(String text, Color color) {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                        RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(getModel().isRollover() ? color.darker() : color);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        btn.setPreferredSize(new Dimension(220, 46));
-        btn.setMaximumSize(new Dimension(340, 46));
+        btn.setPreferredSize(new Dimension(160, 46));
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
@@ -358,7 +427,6 @@ public class PrevEmpFormView extends JPanel {
         return btn;
     }
 
-    // ── Label + Field ─────────────────────────────────────────────────────────
     private JPanel fieldPanel(String label, JComponent field) {
         JPanel p = new JPanel(new BorderLayout(0, 6));
         p.setOpaque(false);
@@ -370,7 +438,6 @@ public class PrevEmpFormView extends JPanel {
         return p;
     }
 
-    // ── Row ───────────────────────────────────────────────────────────────────
     private JPanel row(int cols) {
         JPanel p = new JPanel(new GridLayout(1, cols, 18, 0));
         p.setOpaque(false);
@@ -378,14 +445,13 @@ public class PrevEmpFormView extends JPanel {
         return p;
     }
 
-    // ── Main (for standalone testing) ─────────────────────────────────────────
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             JFrame f = new JFrame("Previous Employment Form View");
             f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             f.setSize(1100, 700);
             f.setLocationRelativeTo(null);
-            f.setContentPane(new PrevEmpFormView("1234-5678-9012"));
+            f.setContentPane(new PrevEmpFormView());
             f.setVisible(true);
         });
     }

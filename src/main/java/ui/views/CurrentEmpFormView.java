@@ -1,33 +1,48 @@
 package ui.views;
 
+import dao.CompanyDAO;
 import dao.CurrentEmpDAO;
+import models.CompanyDetailsTable;
 import models.CurrentEmpRecordTable;
 import ui.frames.SignInFrame;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.sql.Date;
+import java.util.List;
 
 public class CurrentEmpFormView extends JPanel {
 
     private final Color darkBg1     = new Color(10, 22, 40);
     private final Color darkBg2     = new Color(21, 101, 192);
     private final Color accentGreen = new Color(96, 216, 164);
+    private final Color accentAmber = new Color(251, 191, 36);
     private final Color accentRed   = new Color(255, 99, 132);
     private final Color textWhite   = Color.WHITE;
 
-    public JTextField pagIbigMidNoField, companyCodeField, dateEmployedField;
-    public JTextField occupationField;
-    public JComboBox<String> employmentStatusBox;
-    public JComboBox<String> typeOfWorkBox;
-    public JComboBox<String> countryOfAssignmentBox;
-
     private final String loggedInMID;
+    private boolean editMode = false;
 
-    public CurrentEmpFormView() { this(null); }
+    public JTextField pagIbigMidNoField, dateEmployedField, occupationField;
+    public JComboBox<String> companyBox, employmentStatusBox, typeOfWorkBox, countryOfAssignmentBox;
+
+    private JButton editSaveBtn;
+    private List<CompanyDetailsTable> companyList;
 
     public CurrentEmpFormView(String mid) {
         this.loggedInMID = mid;
+        initUI();
+    }
+
+    public CurrentEmpFormView() {
+        this.loggedInMID = null;
+        initUI();
+    }
+
+    private void initUI() {
         setLayout(new BorderLayout());
 
         JPanel bg = new JPanel() {
@@ -38,27 +53,25 @@ public class CurrentEmpFormView extends JPanel {
                 g2.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        bg.setLayout(new GridBagLayout());
+        bg.setLayout(new BorderLayout());
 
         JPanel card = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(new Color(0, 0, 0, 40));
-                g2.fillRoundRect(4, 8, getWidth() - 8, getHeight() - 8, 24, 24);
+                g2.fillRoundRect(4, 8, getWidth()-8, getHeight()-8, 24, 24);
                 g2.setColor(new Color(255, 255, 255, 18));
-                g2.fillRoundRect(0, 0, getWidth() - 4, getHeight() - 4, 24, 24);
+                g2.fillRoundRect(0, 0, getWidth()-4, getHeight()-4, 24, 24);
                 g2.setColor(new Color(255, 255, 255, 45));
-                g2.drawRoundRect(0, 0, getWidth() - 5, getHeight() - 5, 24, 24);
+                g2.drawRoundRect(0, 0, getWidth()-5, getHeight()-5, 24, 24);
                 g2.setColor(accentGreen);
                 g2.setStroke(new BasicStroke(2.5f));
-                g2.drawLine(16, 0, getWidth() - 20, 0);
-                g2.dispose();
-                super.paintComponent(g);
+                g2.drawLine(16, 0, getWidth()-20, 0);
+                g2.dispose(); super.paintComponent(g);
             }
         };
         card.setOpaque(false);
-        card.setPreferredSize(new Dimension(920, 580));
         card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(40, 45, 35, 45));
 
@@ -66,243 +79,258 @@ public class CurrentEmpFormView extends JPanel {
         content.setOpaque(false);
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
-        // ── Title ────────────────────────────────────────────────────────────
-        JPanel titlePanel = new JPanel(new BorderLayout());
-        titlePanel.setOpaque(false);
-        JPanel titleTextPanel = new JPanel();
-        titleTextPanel.setOpaque(false);
-        titleTextPanel.setLayout(new BoxLayout(titleTextPanel, BoxLayout.Y_AXIS));
-
+        // ── Title ─────────────────────────────────────────────────────────────
         JLabel heading = new JLabel("Current Employment Record");
         heading.setFont(new Font("Arial Black", Font.BOLD, 24));
         heading.setForeground(textWhite);
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subHeading = new JLabel("Review and update your current employment information.");
+        JLabel subHeading = new JLabel("View and manage your current employment information.");
         subHeading.setFont(new Font("Arial", Font.PLAIN, 13));
         subHeading.setForeground(new Color(255, 255, 255, 160));
         subHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        titleTextPanel.add(heading);
-        titleTextPanel.add(Box.createRigidArea(new Dimension(0, 8)));
-        titleTextPanel.add(subHeading);
-        titlePanel.add(titleTextPanel, BorderLayout.WEST);
+        JPanel titleBlock = new JPanel();
+        titleBlock.setOpaque(false);
+        titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
+        titleBlock.setAlignmentX(Component.LEFT_ALIGNMENT);
+        titleBlock.add(heading);
+        titleBlock.add(Box.createRigidArea(new Dimension(0, 6)));
+        titleBlock.add(subHeading);
 
-        // ── Rows ─────────────────────────────────────────────────────────────
+        // ── Load companies for dropdown ───────────────────────────────────────
+        companyList = new CompanyDAO().getAllCompanies();
+        String[] companyItems = buildCompanyItems();
+
+        // ── Fields ────────────────────────────────────────────────────────────
         JPanel r1 = row(2);
-        // PAG-IBIG MID NO. — locked
-        pagIbigMidNoField = buildTextField(false);
+        pagIbigMidNoField = buildTextField();
+        pagIbigMidNoField.setText(loggedInMID != null ? loggedInMID : "");
         r1.add(fieldPanel("PAG-IBIG MID NO.", pagIbigMidNoField));
-        // COMPANY CODE — editable
-        companyCodeField = buildTextField(true);
-        r1.add(fieldPanel("COMPANY CODE", companyCodeField));
+
+        companyBox = new JComboBox<>(companyItems);
+        companyBox.setFont(new Font("Arial", Font.PLAIN, 14));
+        companyBox.setForeground(Color.WHITE);
+        companyBox.setBackground(new Color(25, 35, 60));
+        r1.add(fieldPanel("COMPANY", companyBox));
 
         JPanel r2 = row(2);
-        // OCCUPATION — editable
-        occupationField = buildTextField(true);
-        r2.add(fieldPanel("OCCUPATION", occupationField));
-        // DATE EMPLOYED — editable
-        dateEmployedField = buildTextField(true);
-        r2.add(fieldPanel("DATE EMPLOYED (YYYY-MM-DD)", dateEmployedField));
+        r2.add(fieldPanel("OCCUPATION *",                 occupationField   = buildTextField()));
+        r2.add(fieldPanel("DATE EMPLOYED (YYYY-MM-DD) *", dateEmployedField = buildTextField()));
 
         JPanel r3 = row(3);
-        // All combos — editable
-        employmentStatusBox = buildComboBox(new String[]{
-                "Select", "Regular", "Probationary", "Contractual",
-                "Project-based", "Casual", "Part-time"
-        }, true);
-        r3.add(fieldPanel("EMPLOYMENT STATUS", employmentStatusBox));
-
-        typeOfWorkBox = buildComboBox(new String[]{
-                "Select", "Private", "Government", "Self-Employed", "Mixed"
-        }, true);
-        r3.add(fieldPanel("TYPE OF WORK", typeOfWorkBox));
-
-        countryOfAssignmentBox = buildComboBox(new String[]{
+        r3.add(fieldPanel("EMPLOYMENT STATUS *", employmentStatusBox = buildComboBox(new String[]{
+                "Select", "PERMANENT/REGULAR", "CASUAL", "CONTRACTUAL", "PROJECT BASED", "PART-TIME/TEMPORARY"
+        })));
+        r3.add(fieldPanel("TYPE OF WORK", typeOfWorkBox = buildComboBox(new String[]{
+                "Select", "LAND-BASED", "SEA-BASED"
+        })));
+        r3.add(fieldPanel("COUNTRY OF ASSIGNMENT *", countryOfAssignmentBox = buildComboBox(new String[]{
                 "Select", "Philippines", "Saudi Arabia", "United Arab Emirates",
-                "Qatar", "Kuwait", "Singapore", "Hong Kong",
-                "United States", "Canada", "Other"
-        }, true);
-        r3.add(fieldPanel("COUNTRY OF ASSIGNMENT", countryOfAssignmentBox));
+                "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
+        })));
 
-        // ── Buttons ──────────────────────────────────────────────────────────
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        // ── Buttons ───────────────────────────────────────────────────────────
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         buttonPanel.setOpaque(false);
-
-        JButton saveBtn = buildButton("Save", accentGreen);
-        saveBtn.addActionListener(e -> saveData());
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JButton returnBtn = buildButton("Back", accentRed);
+        editSaveBtn       = buildButton("Edit", accentAmber);
+
         returnBtn.addActionListener(e -> {
             Window window = SwingUtilities.getWindowAncestor(CurrentEmpFormView.this);
             if (window != null) window.dispose();
             new SignInFrame(loggedInMID);
         });
 
-        buttonPanel.add(saveBtn);
-        buttonPanel.add(returnBtn);
-        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        editSaveBtn.addActionListener(e -> {
+            if (!editMode) {
+                editMode = true;
+                editSaveBtn.setText("Save Changes");
+                unlockFields();
+            } else {
+                handleUpdate();
+            }
+        });
 
-        // ── Assemble ─────────────────────────────────────────────────────────
-        content.add(titlePanel);
-        content.add(Box.createRigidArea(new Dimension(0, 35)));
+        buttonPanel.add(returnBtn);
+        buttonPanel.add(editSaveBtn);
+
+        content.add(titleBlock);
+        content.add(Box.createRigidArea(new Dimension(0, 30)));
         content.add(r1);
-        content.add(Box.createRigidArea(new Dimension(0, 20)));
+        content.add(Box.createRigidArea(new Dimension(0, 18)));
         content.add(r2);
-        content.add(Box.createRigidArea(new Dimension(0, 20)));
+        content.add(Box.createRigidArea(new Dimension(0, 18)));
         content.add(r3);
-        content.add(Box.createRigidArea(new Dimension(0, 35)));
+        content.add(Box.createRigidArea(new Dimension(0, 30)));
         content.add(buttonPanel);
 
         card.add(content, BorderLayout.CENTER);
-        bg.add(card);
+
+        JPanel cardWrap = new JPanel(new BorderLayout());
+        cardWrap.setOpaque(false);
+        cardWrap.setBorder(new EmptyBorder(28, 28, 28, 28));
+        cardWrap.add(card, BorderLayout.CENTER);
+
+        bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
-        loadDataFromDB();
+        if (loggedInMID != null && !loggedInMID.isEmpty()) {
+            loadData();
+        }
+        lockFields();
     }
 
-    // ── Load from DB ──────────────────────────────────────────────────────────
-    private void loadDataFromDB() {
-        if (loggedInMID == null || loggedInMID.isEmpty()) {
-            showNoRecordMessage();
-            return;
-        }
+    // ── Load Data ─────────────────────────────────────────────────────────────
+    private void loadData() {
         CurrentEmpDAO dao = new CurrentEmpDAO();
         CurrentEmpRecordTable record = dao.getCurrentEmpByMID(loggedInMID);
 
         if (record == null) {
-            showNoRecordMessage();
+            JOptionPane.showMessageDialog(this,
+                "No current employment record found for this MID.",
+                "Not Found", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
-        pagIbigMidNoField.setText(record.getPagIbigMIDNo()  != null ? record.getPagIbigMIDNo()            : "");
-        companyCodeField.setText (record.getCompanyCode()   != null ? record.getCompanyCode()              : "");
-        occupationField.setText  (record.getOccupation()    != null ? record.getOccupation()               : "");
-        dateEmployedField.setText(record.getDateEmployed()  != null ? record.getDateEmployed().toString()  : "");
+        occupationField.setText(safe(record.getOccupation()));
+        dateEmployedField.setText(record.getDateEmployed() != null ? record.getDateEmployed().toString() : "");
+        setComboByValue(employmentStatusBox, record.getEmploymentStatus());
+        setComboByValue(typeOfWorkBox, record.getTypeOfWork());
+        setComboByValue(countryOfAssignmentBox, record.getCountryOfAssignment());
 
-        setComboSelection(employmentStatusBox,    record.getEmploymentStatus());
-        setComboSelection(typeOfWorkBox,          record.getTypeOfWork());
-        setComboSelection(countryOfAssignmentBox, record.getCountryOfAssignment());
+        String code = record.getCompanyCode();
+        for (int i = 0; i < companyBox.getItemCount(); i++) {
+            String item = companyBox.getItemAt(i);
+            if (item.contains("(" + code + ")")) {
+                companyBox.setSelectedIndex(i);
+                break;
+            }
+        }
     }
 
-    // ── Save / Update to DB ───────────────────────────────────────────────────
-    private void saveData() {
-        if (loggedInMID == null || loggedInMID.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                "Cannot save: no member ID is loaded.",
-                "Save Error", JOptionPane.WARNING_MESSAGE);
-            return;
+    // ── Handle Update ─────────────────────────────────────────────────────────
+    private void handleUpdate() {
+        if (occupationField.getText().trim().isEmpty()) {
+            showError("Occupation is required."); return;
+        }
+        if ("Select".equals(companyBox.getSelectedItem())) {
+            showError("Please select a company."); return;
+        }
+        if ("Select".equals(employmentStatusBox.getSelectedItem())) {
+            showError("Please select an employment status."); return;
+        }
+        if ("Select".equals(countryOfAssignmentBox.getSelectedItem())) {
+            showError("Please select a country of assignment."); return;
         }
 
+        Date dateEmployed;
         try {
-            // Validate date before building the record
-            String dateText = dateEmployedField.getText().trim();
-            Date dateEmployed = (dateText.isEmpty() || dateText.equals("N/A"))
-                    ? null
-                    : Date.valueOf(dateText); // throws if format is wrong
+            dateEmployed = Date.valueOf(dateEmployedField.getText().trim());
+        } catch (IllegalArgumentException ex) {
+            showError("Date must be in YYYY-MM-DD format."); return;
+        }
 
-            CurrentEmpRecordTable record = new CurrentEmpRecordTable(
-                loggedInMID,
-                companyCodeField.getText().trim(),
-                occupationField.getText().trim(),
+        String selected = (String) companyBox.getSelectedItem();
+        String companyCode = selected.substring(selected.lastIndexOf("(") + 1, selected.lastIndexOf(")"));
+
+        String typeOfWork = "Select".equals(typeOfWorkBox.getSelectedItem()) ? null : (String) typeOfWorkBox.getSelectedItem();
+
+        CurrentEmpRecordTable record = new CurrentEmpRecordTable(
+                loggedInMID, companyCode, occupationField.getText().trim(),
                 (String) employmentStatusBox.getSelectedItem(),
-                (String) typeOfWorkBox.getSelectedItem(),
+                typeOfWork,
                 (String) countryOfAssignmentBox.getSelectedItem(),
                 dateEmployed
-            );
+        );
 
-            CurrentEmpDAO dao = new CurrentEmpDAO();
-            boolean success = dao.updateCurrentEmp(record);
+        CurrentEmpDAO dao = new CurrentEmpDAO();
+        boolean updated = dao.updateCurrentEmp(record);
 
-            if (success) {
-                JOptionPane.showMessageDialog(this,
-                    "Current employment information updated successfully.",
-                    "Saved", JOptionPane.INFORMATION_MESSAGE);
-            } else {
-                JOptionPane.showMessageDialog(this,
-                    "Update failed. No rows were affected.",
-                    "Save Error", JOptionPane.ERROR_MESSAGE);
-            }
+        if (!updated) { showError("Failed to update. Please try again."); return; }
 
-        } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(this,
-                "Invalid date format. Please use YYYY-MM-DD for Date Employed.",
-                "Validation Error", JOptionPane.ERROR_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                "An error occurred while saving:\n" + ex.getMessage(),
-                "Save Error", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, "Employment record updated successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+        editMode = false;
+        editSaveBtn.setText("Edit");
+        lockFields();
+    }
+
+    private String[] buildCompanyItems() {
+        String[] items = new String[companyList.size() + 1];
+        items[0] = "Select";
+        for (int i = 0; i < companyList.size(); i++) {
+            CompanyDetailsTable c = companyList.get(i);
+            items[i + 1] = c.getCompanyName() + " (" + c.getCompanyCode() + ")";
+        }
+        return items;
+    }
+
+    private void lockFields() {
+        pagIbigMidNoField.setEditable(false); pagIbigMidNoField.setFocusable(false);
+        occupationField.setEditable(false);   occupationField.setFocusable(false);
+        dateEmployedField.setEditable(false); dateEmployedField.setFocusable(false);
+        companyBox.setEnabled(false);
+        employmentStatusBox.setEnabled(false);
+        typeOfWorkBox.setEnabled(false);
+        countryOfAssignmentBox.setEnabled(false);
+    }
+
+    private void unlockFields() {
+        occupationField.setEditable(true);   occupationField.setFocusable(true);
+        dateEmployedField.setEditable(true); dateEmployedField.setFocusable(true);
+        companyBox.setEnabled(true);
+        employmentStatusBox.setEnabled(true);
+        typeOfWorkBox.setEnabled(true);
+        countryOfAssignmentBox.setEnabled(true);
+    }
+
+    private void setComboByValue(JComboBox<String> box, String value) {
+        if (value == null) return;
+        for (int i = 0; i < box.getItemCount(); i++) {
+            if (box.getItemAt(i).equalsIgnoreCase(value)) { box.setSelectedIndex(i); return; }
         }
     }
 
-    // ── No record fallback ────────────────────────────────────────────────────
-    private void showNoRecordMessage() {
-        pagIbigMidNoField.setText(loggedInMID != null ? loggedInMID : "");
-        companyCodeField.setText("N/A");
-        occupationField.setText("No record found");
-        dateEmployedField.setText("N/A");
-        employmentStatusBox.setSelectedItem("Select");
-        typeOfWorkBox.setSelectedItem("Select");
-        countryOfAssignmentBox.setSelectedItem("Select");
+    private String safe(String s) { return s != null ? s : ""; }
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.WARNING_MESSAGE);
     }
 
-    // ── Combo selection helper ────────────────────────────────────────────────
-    private void setComboSelection(JComboBox<String> combo, String value) {
-        if (value == null || value.isEmpty()) return;
-        for (int i = 0; i < combo.getItemCount(); i++) {
-            if (combo.getItemAt(i).equalsIgnoreCase(value)) {
-                combo.setSelectedIndex(i);
-                return;
-            }
-        }
-        combo.addItem(value);
-        combo.setSelectedItem(value);
-    }
-
-    // ── Styled Text Field — editable flag ─────────────────────────────────────
-    private JTextField buildTextField(boolean editable) {
+    // ── UI Helpers ────────────────────────────────────────────────────────────
+    private JTextField buildTextField() {
         JTextField field = new JTextField() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                // brighter fill + green border for editable, dim for locked
-                g2.setColor(editable
-                        ? new Color(255, 255, 255, 25)
-                        : new Color(255, 255, 255, 10));
+                g2.setColor(new Color(255, 255, 255, 10));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-                g2.setColor(editable
-                        ? new Color(96, 216, 164, 80)   // green tint = editable
-                        : new Color(255, 255, 255, 35)); // white dim  = locked
+                g2.setColor(isFocusOwner()
+                        ? new Color(96, 216, 164, 180)
+                        : new Color(255, 255, 255, 35));
                 g2.setStroke(new BasicStroke(1.5f));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-                g2.dispose();
-                super.paintComponent(g);
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
+                g2.dispose(); super.paintComponent(g);
             }
         };
-        field.setOpaque(false);
-        field.setForeground(new Color(220, 220, 220));
-        field.setCaretColor(Color.WHITE);
-        field.setFont(new Font("Arial", Font.PLAIN, 15));
+        field.setOpaque(false); field.setForeground(new Color(220, 220, 220));
+        field.setCaretColor(Color.WHITE); field.setFont(new Font("Arial", Font.PLAIN, 15));
         field.setBorder(new EmptyBorder(10, 14, 10, 14));
-        field.setEditable(editable);
-        field.setFocusable(editable);
+        field.addFocusListener(new FocusAdapter() {
+            public void focusGained(FocusEvent e) { field.repaint(); }
+            public void focusLost(FocusEvent e)   { field.repaint(); }
+        });
         return field;
     }
 
-    // ── Styled ComboBox — editable flag ──────────────────────────────────────
-    private JComboBox<String> buildComboBox(String[] items, boolean enabled) {
+    private JComboBox<String> buildComboBox(String[] items) {
         JComboBox<String> box = new JComboBox<>(items);
         box.setFont(new Font("Arial", Font.PLAIN, 14));
-        box.setForeground(Color.WHITE);
-        box.setBackground(enabled
-                ? new Color(25, 55, 90)      // slightly brighter when enabled
-                : new Color(25, 35, 60));
-        box.setBorder(BorderFactory.createEmptyBorder());
-        box.setEnabled(enabled);
-        return box;
+        box.setForeground(Color.WHITE); box.setBackground(new Color(25, 35, 60));
+        box.setBorder(BorderFactory.createEmptyBorder()); return box;
     }
 
-    // ── Styled Button ─────────────────────────────────────────────────────────
     private JButton buildButton(String text, Color color) {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
@@ -310,50 +338,37 @@ public class CurrentEmpFormView extends JPanel {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(getModel().isRollover() ? color.darker() : color);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-                g2.dispose();
-                super.paintComponent(g);
+                g2.dispose(); super.paintComponent(g);
             }
         };
         btn.setPreferredSize(new Dimension(160, 46));
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setOpaque(false);
+        btn.setContentAreaFilled(false); btn.setBorderPainted(false);
+        btn.setFocusPainted(false); btn.setOpaque(false);
         btn.setForeground(new Color(10, 22, 40));
         btn.setFont(new Font("Arial Black", Font.BOLD, 14));
-        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        return btn;
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR)); return btn;
     }
 
-    // ── Label + Field ─────────────────────────────────────────────────────────
     private JPanel fieldPanel(String label, JComponent field) {
-        JPanel p = new JPanel(new BorderLayout(0, 6));
-        p.setOpaque(false);
-        JLabel lbl = new JLabel(label);
-        lbl.setFont(new Font("Arial", Font.BOLD, 11));
+        JPanel p = new JPanel(new BorderLayout(0, 6)); p.setOpaque(false);
+        JLabel lbl = new JLabel(label); lbl.setFont(new Font("Arial", Font.BOLD, 11));
         lbl.setForeground(new Color(168, 208, 255));
-        p.add(lbl, BorderLayout.NORTH);
-        p.add(field, BorderLayout.CENTER);
-        return p;
+        p.add(lbl, BorderLayout.NORTH); p.add(field, BorderLayout.CENTER); return p;
     }
 
-    // ── Row Layout ────────────────────────────────────────────────────────────
     private JPanel row(int cols) {
-        JPanel p = new JPanel(new GridLayout(1, cols, 18, 0));
-        p.setOpaque(false);
+        JPanel p = new JPanel(new GridLayout(1, cols, 18, 0)); p.setOpaque(false);
         p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
         return p;
     }
 
-    // ── Main (for standalone testing) ─────────────────────────────────────────
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             JFrame f = new JFrame("Current Employment Form View");
             f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            f.setSize(1150, 700);
-            f.setLocationRelativeTo(null);
-            f.setContentPane(new CurrentEmpFormView("1234-5678-9012"));
-            f.setVisible(true);
+            f.setSize(1150, 700); f.setLocationRelativeTo(null);
+            f.setContentPane(new CurrentEmpFormView()); f.setVisible(true);
         });
     }
 }

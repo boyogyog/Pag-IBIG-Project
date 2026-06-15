@@ -9,6 +9,7 @@ import ui.forms.CurrentEmpForm;
 import ui.forms.HeirsForm;
 import ui.forms.MemberInfoForm;
 import ui.forms.PrevEmpForm;
+import ui.utils.SetUpPassword;
 
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -32,14 +33,11 @@ public class SignUpFrame extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // CHANGED: Removed unconditional RegistrationSession.reset() + generateNextMID() that
-        // always ran at the top. Replaced with a conditional block so returning from a
-        // sub-form reuses the existing session instead of wiping it and minting a new MID.
-        RegistrationSession session = RegistrationSession.getInstance(); // ADDED: get session once, reused throughout
+        RegistrationSession session = RegistrationSession.getInstance();
 
-        if (session.getTempMID() == null || session.getTempMID().isEmpty()) { // ADDED: only generate MID on fresh entry
-            MemberDAO memberDAO = new MemberDAO(); // CHANGED: moved inside the if-block (was always executed before)
-            String generatedMID = memberDAO.generateNextMID(); // CHANGED: moved inside the if-block
+        if (session.getTempMID() == null || session.getTempMID().isEmpty()) {
+            MemberDAO memberDAO = new MemberDAO();
+            String generatedMID = memberDAO.generateNextMID();
             if (generatedMID == null) {
                 JOptionPane.showMessageDialog(null,
                     "Could not connect to the database.\nPlease try again later.",
@@ -47,18 +45,17 @@ public class SignUpFrame extends JFrame {
                 dispose();
                 return;
             }
-            tempMID = generatedMID; // CHANGED: moved inside the if-block
-            session.setTempMID(tempMID); // CHANGED: was session.setTempMID() after reset(); now only called on first entry
-        } else { // ADDED: returning from a sub-form — session already has a valid MID
-            tempMID = session.getTempMID(); // ADDED: reuse the existing MID instead of generating a new one
-        } // ADDED
+            tempMID = generatedMID;
+            session.setTempMID(tempMID);
+        } else {
+            tempMID = session.getTempMID();
+        }
 
         DiagonalGradientPanel bg = new DiagonalGradientPanel(darkBg1, darkBg2);
         bg.setLayout(new BorderLayout());
         setContentPane(bg);
 
         // ── Top bar ──────────────────────────────────────────────────────────
-        // CHANGED: Removed unused empty JPanel topBar wrapper that was declared but never added to the layout.
         JPanel topBarBg = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -77,13 +74,13 @@ public class SignUpFrame extends JFrame {
         backBtn.addActionListener(e -> {
             int choice = JOptionPane.showConfirmDialog(
                 null,
-                "Are you sure you want to go back?\nYour registration progress will be lost.", // CHANGED: updated message text to say "progress will be lost" instead of "Unsaved changes will be lost"
+                "Are you sure you want to go back?\nYour registration progress will be lost.",
                 "Confirm",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
             );
             if (choice == JOptionPane.YES_OPTION) {
-                RegistrationSession.reset();   // CHANGED: reset() moved here — only wipes session on explicit back, not on every construction
+                RegistrationSession.reset();
                 new LoginFrame();
                 dispose();
             }
@@ -156,7 +153,7 @@ public class SignUpFrame extends JFrame {
         dot.setForeground(accentAmber);
         dot.setFont(new Font("Arial", Font.PLAIN, 10));
 
-        JLabel midLabel = new JLabel("  PAG-IBIG MID NO: " + tempMID + "  "); // CHANGED: added trailing spaces for visual padding (was no trailing spaces)
+        JLabel midLabel = new JLabel("  PAG-IBIG MID NO: " + tempMID + "  ");
         midLabel.setFont(new Font("Arial Black", Font.BOLD, 13));
         midLabel.setForeground(textWhite);
 
@@ -183,10 +180,12 @@ public class SignUpFrame extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(new Color(255, 255, 255, 30));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 4, 4);
+                int completed = session.completedCount();
+                float pct = completed / 4.0f;
                 GradientPaint gp = new GradientPaint(0, 0, accentGreen,
-                        (int)(getWidth() * 0.4), 0, new Color(30, 158, 117));
+                        (int)(getWidth() * pct), 0, new Color(30, 158, 117));
                 g2.setPaint(gp);
-                g2.fillRoundRect(0, 0, (int)(getWidth() * 0.4), getHeight(), 4, 4);
+                g2.fillRoundRect(0, 0, (int)(getWidth() * pct), getHeight(), 4, 4);
                 g2.dispose();
             }
         };
@@ -228,27 +227,25 @@ public class SignUpFrame extends JFrame {
         Color[] purpleAcc = {new Color(139,92,246,60),  new Color(139,92,246,100),  new Color(139,92,246)};
         Color[] amberAcc  = {new Color(251,191,36,60),  new Color(251,191,36,100),  new Color(251,191,36)};
 
-        // CHANGED: All four DarkModuleCard constructors now read their status from the session
-        // instead of hardcoding "PENDING". This makes cards show "DONE" once a module is saved.
         DarkModuleCard btnMember = new DarkModuleCard(
                 "MEMBER INFORMATION",
-                session.isMemberInfoDone() ? "DONE" : "PENDING", // CHANGED: was hardcoded "PENDING"
-                "\uD83D\uDC64", blueAcc, memberIcon, 370, 30, 260, 180); // CHANGED: replaced emoji literal "👤" with unicode escape for consistency
+                session.isMemberInfoDone() ? "DONE" : "PENDING",
+                "\uD83D\uDC64", blueAcc, memberIcon, 370, 30, 260, 180);
 
         DarkModuleCard btnHeirs = new DarkModuleCard(
                 "HEIRS INFORMATION",
-                session.isHeirsDone() ? "DONE" : "PENDING", // CHANGED: was hardcoded "PENDING"
-                "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67", tealAcc, heirsIcon, 380, 30, 200, 150); // CHANGED: replaced emoji literal "👨‍👩‍👧" with unicode escape
+                "OPTIONAL",
+                "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67", tealAcc, heirsIcon, 380, 30, 200, 150);
 
         DarkModuleCard btnCurrentEmp = new DarkModuleCard(
                 "CURRENT EMPLOYMENT INFORMATION",
-                session.isCurrentEmpDone() ? "DONE" : "PENDING", // CHANGED: was hardcoded "PENDING"
-                "\uD83D\uDCBC", purpleAcc, currentEmpIcon, 390, 30, 220, 160); // CHANGED: replaced emoji literal "💼" with unicode escape
+                session.isCurrentEmpDone() ? "DONE" : "PENDING",
+                "\uD83D\uDCBC", purpleAcc, currentEmpIcon, 390, 30, 220, 160);
 
         DarkModuleCard btnPrevEmp = new DarkModuleCard(
                 "PREVIOUS EMPLOYMENT INFORMATION",
-                session.isPrevEmpDone() ? "DONE" : "PENDING", // CHANGED: was hardcoded "PENDING"
-                "\uD83D\uDCCB", amberAcc, prevEmpIcon, 390, 30, 220, 160); // CHANGED: replaced emoji literal "📋" with unicode escape
+                "OPTIONAL",
+                "\uD83D\uDCCB", amberAcc, prevEmpIcon, 390, 30, 220, 160);
 
         btnMember.addActionListener(e -> {
             new MemberInfoForm();
@@ -259,7 +256,7 @@ public class SignUpFrame extends JFrame {
             JFrame frame = new JFrame("Pag-CONNECT — Heirs Information");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(1100, 750);
-            frame.add(new HeirsForm());
+            frame.add(new HeirsForm(tempMID));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
             SignUpFrame.this.dispose();
@@ -293,6 +290,41 @@ public class SignUpFrame extends JFrame {
         bg.add(northPanel, BorderLayout.NORTH);
         bg.add(gridPanel,  BorderLayout.CENTER);
 
+        // ── Submit Application button (only when required modules done) ───────
+        boolean requiredDone = session.isMemberInfoDone() && session.isCurrentEmpDone();
+        if (requiredDone) {
+            JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 14));
+            southPanel.setOpaque(false);
+
+            JButton submitAppBtn = new JButton("\uD83C\uDF89  Submit My Application") {
+                @Override protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(getModel().isRollover()
+                            ? new Color(96, 216, 164).darker()
+                            : new Color(96, 216, 164));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+                    g2.dispose();
+                    super.paintComponent(g);
+                }
+            };
+            submitAppBtn.setPreferredSize(new Dimension(320, 48));
+            submitAppBtn.setContentAreaFilled(false);
+            submitAppBtn.setBorderPainted(false);
+            submitAppBtn.setFocusPainted(false);
+            submitAppBtn.setOpaque(false);
+            submitAppBtn.setForeground(new Color(10, 22, 40));
+            submitAppBtn.setFont(new Font("Arial Black", Font.BOLD, 15));
+            submitAppBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            submitAppBtn.addActionListener(e -> {
+                dispose();
+                SwingUtilities.invokeLater(() -> new SetUpPassword(tempMID));
+            });
+
+            southPanel.add(submitAppBtn);
+            bg.add(southPanel, BorderLayout.SOUTH);
+        }
+
         setVisible(true);
     }
 
@@ -324,8 +356,6 @@ public class SignUpFrame extends JFrame {
             public void mouseExited(MouseEvent e)  { btn.setForeground(Color.WHITE); }
         });
     }
-
-    // CHANGED: Removed unused navigateTo() stub method that was never called anywhere.
 
     // ── Inner classes ────────────────────────────────────────────────────────
 
@@ -445,19 +475,25 @@ public class SignUpFrame extends JFrame {
 
             int pillY = line2.length() > 0 ? pad + 106 : pad + 90;
 
-            // ADDED: Pill colors now vary based on status — green for DONE, amber for PENDING.
-            // Previously the pill was always drawn in hardcoded amber regardless of status.
-            boolean done     = "DONE".equals(statusText); // ADDED: check status to pick pill color
-            Color pillFill   = done ? new Color(96, 216, 164, 40)  : new Color(251, 191, 36, 40);  // ADDED
-            Color pillBorder = done ? new Color(96, 216, 164, 100) : new Color(251, 191, 36, 100); // ADDED
-            Color pillText   = done ? new Color(96, 216, 164)      : accentAmber;                  // ADDED
+            boolean done     = "DONE".equals(statusText);
+            boolean optional = "OPTIONAL".equals(statusText);
+            Color pillFill   = done     ? new Color(96, 216, 164, 40)
+                             : optional ? new Color(255, 255, 255, 20)
+                             :            new Color(251, 191,  36, 40);
+            Color pillBorder = done     ? new Color(96, 216, 164, 100)
+                             : optional ? new Color(255, 255, 255, 60)
+                             :            new Color(251, 191,  36, 100);
+            Color pillText   = done     ? new Color(96, 216, 164)
+                             : optional ? new Color(255, 255, 255, 200)
+                             :            accentAmber;
 
-            t.setColor(pillFill);   // CHANGED: was hardcoded new Color(251, 191, 36, 40)
-            t.fillRoundRect(pad, pillY, 74, 20, 10, 10);
-            t.setColor(pillBorder); // CHANGED: was hardcoded new Color(251, 191, 36, 100)
-            t.drawRoundRect(pad, pillY, 74, 20, 10, 10);
+            int pillW = optional ? 90 : 74;
+            t.setColor(pillFill);
+            t.fillRoundRect(pad, pillY, pillW, 20, 10, 10);
+            t.setColor(pillBorder);
+            t.drawRoundRect(pad, pillY, pillW, 20, 10, 10);
             t.setFont(new Font("Arial", Font.BOLD, 10));
-            t.setColor(pillText);   // CHANGED: was hardcoded accentAmber always
+            t.setColor(pillText);
             t.drawString("● " + statusText, pad + 8, pillY + 14);
 
             t.setFont(new Font("Arial", Font.BOLD, 18));

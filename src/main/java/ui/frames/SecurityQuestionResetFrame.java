@@ -19,6 +19,7 @@ public class SecurityQuestionResetFrame extends JFrame {
     private final Color accentRed   = new Color(255,  99,  99);
     private final Color accentBlue  = new Color(100, 180, 255);
     private final Color textWhite   = Color.WHITE;
+    private final String loggedInMID;
 
     private static final String[] QUESTIONS = {
         "— Select a question —",
@@ -38,7 +39,8 @@ public class SecurityQuestionResetFrame extends JFrame {
     private JTextField        ans1Field, ans2Field, ans3Field;
     private JLabel            feedbackLabel;
 
-    public SecurityQuestionResetFrame() {
+    public SecurityQuestionResetFrame(String mid) {
+        this.loggedInMID = mid;
         setTitle("Pag-CONNECT — Forgot Password");
         setSize(1024, 768);
         setDefaultCloseOperation(EXIT_ON_CLOSE);

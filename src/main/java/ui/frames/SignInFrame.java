@@ -152,7 +152,7 @@ public class SignInFrame extends JFrame {
             }
         });
         editBtn.addActionListener(e -> {
-            new MemberRecordForm(SignInFrame.this).setVisible(true);
+            new MemberRecordForm(SignInFrame.this, loggedInMID).setVisible(true);
             SignInFrame.this.setVisible(false);
         });
 
@@ -181,7 +181,7 @@ public class SignInFrame extends JFrame {
             }
         });
         settingsBtn.addActionListener(e -> {
-            new SecurityQuestionsSetupFrame().setVisible(true);
+            new SecurityQuestionsSetupFrame(loggedInMID).setVisible(true);
             SignInFrame.this.dispose();
         });
 
