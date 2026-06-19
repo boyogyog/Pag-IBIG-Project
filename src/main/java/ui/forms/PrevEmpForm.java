@@ -6,7 +6,6 @@ import main.RegistrationSession;
 import models.CompanyDetailsTable;
 import models.PrevEmpTable;
 import ui.frames.SignUpFrame;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -146,7 +145,17 @@ public class PrevEmpForm extends JPanel {
         bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
-        addEntry(); // start with one blank entry
+     // Load existing records if any, else add blank entry
+        String mid = RegistrationSession.getInstance().getTempMID();
+        List<PrevEmpTable> existing = new PrevEmpDAO().getPrevEmpByMID(mid);
+
+        if (existing.isEmpty()) {
+            addEntry();
+        } else {
+            for (PrevEmpTable record : existing) {
+                addEntryWithData(record);
+            }
+        }
     }
 
     // ── Load Companies from DB ────────────────────────────────────────────────
@@ -410,6 +419,42 @@ public class PrevEmpForm extends JPanel {
         empCount++;
         PrevEmpEntry entry = new PrevEmpEntry(empCount, this);
         entries.add(entry);
+        listPanel.add(entry);
+        listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
+        listPanel.revalidate();
+        listPanel.repaint();
+    }
+    
+    public void addEntryWithData(PrevEmpTable record) {
+        empCount++;
+        PrevEmpEntry entry = new PrevEmpEntry(empCount, this);
+        entries.add(entry);
+
+        // Set company dropdown
+        for (int i = 0; i < companyDisplayItems.length; i++) {
+            CompanyDetailsTable c = i > 0 && i <= companyList.size() ? companyList.get(i - 1) : null;
+            if (c != null && c.getCompanyCode().equals(record.getCompanyCode())) {
+                entry.companyBox.setSelectedIndex(i);
+                break;
+            }
+        }
+
+        // Set dates
+        if (record.getFromDate() != null) {
+            AbstractDocument fromDoc = (AbstractDocument) entry.fromDateField.getDocument();
+            javax.swing.text.DocumentFilter f1 = fromDoc.getDocumentFilter();
+            fromDoc.setDocumentFilter(null);
+            entry.fromDateField.setText(record.getFromDate().toString());
+            fromDoc.setDocumentFilter(f1);
+        }
+        if (record.getToDate() != null) {
+            AbstractDocument toDoc = (AbstractDocument) entry.toDateField.getDocument();
+            javax.swing.text.DocumentFilter f2 = toDoc.getDocumentFilter();
+            toDoc.setDocumentFilter(null);
+            entry.toDateField.setText(record.getToDate().toString());
+            toDoc.setDocumentFilter(f2);
+        }
+
         listPanel.add(entry);
         listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
         listPanel.revalidate();
