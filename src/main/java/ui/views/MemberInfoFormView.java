@@ -1,6 +1,6 @@
 package ui.views;
 
-import java.awt.BasicStroke;
+import java.awt.BasicStroke;	
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -36,6 +36,10 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.basic.BasicScrollBarUI;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 import dao.MemberDAO;
 import models.MemberTable;
@@ -280,9 +284,11 @@ public class MemberInfoFormView extends JPanel {
         if (birthdateField.getText().trim().isEmpty())  { showError("Birthdate is required.");   return; }
         if (cellphoneNumField.getText().trim().isEmpty()){ showError("Cellphone is required.");  return; }
 
-        Date birthdate;
-        try { birthdate = Date.valueOf(birthdateField.getText().trim()); }
-        catch (IllegalArgumentException ex) { showError("Birthdate must be YYYY-MM-DD."); return; }
+        String dateText = birthdateField.getText().trim();
+        if (dateText.isEmpty()) { showError("Birthdate is required."); return; }
+        String dateError = validateDate(dateText);
+        if (dateError != null) { showError(dateError); return; }
+        Date birthdate = Date.valueOf(dateText);
 
         String membershipType;
         if ("Others".equals(membershipTypeBox.getSelectedItem())) {
@@ -521,6 +527,89 @@ public class MemberInfoFormView extends JPanel {
 
         JPanel r6 = row(3);
         r6.add(lf("Birthdate (YYYY-MM-DD) *", birthdateField  = tf()));
+
+        // ── Auto-insert dashes + block non-digits ─────────────────────────────
+        ((AbstractDocument) birthdateField.getDocument()).setDocumentFilter(new DocumentFilter() {
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String string, AttributeSet attr)
+                    throws BadLocationException {
+                String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+
+                if (string.isEmpty() && length > 0) {
+                    if (offset > 0 && current.length() > offset - 1
+                            && current.charAt(offset - 1) == '-') {
+                        String withoutDash = current.substring(0, offset - 1)
+                                + current.substring(offset + length - (length > 0 ? 0 : 0));
+                        fb.replace(0, current.length(),
+                                withoutDash.substring(0, Math.max(0, offset - 1)), attr);
+                        return;
+                    }
+                    super.replace(fb, offset, length, string, attr);
+                    return;
+                }
+
+                if (!string.matches("\\d*")) return;
+
+                String currentRaw = current.replace("-", "");
+                String cursorRaw  = current.substring(0, offset).replace("-", "");
+                String newRaw     = cursorRaw + string + currentRaw.substring(cursorRaw.length());
+
+                if (newRaw.length() > 8) return;
+
+                String formatted = formatDate(newRaw);
+                fb.replace(0, current.length(), formatted, attr);
+
+                int newCursor = cursorRaw.length() + string.length();
+                if (newCursor >= 4) newCursor++;
+                if (newCursor >= 7) newCursor++;
+                final int pos = Math.min(newCursor, formatted.length());
+                SwingUtilities.invokeLater(() -> birthdateField.setCaretPosition(pos));
+            }
+
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                    throws BadLocationException {
+                replace(fb, offset, 0, string, attr);
+            }
+
+            private String formatDate(String digits) {
+                if (digits.length() <= 4) return digits;
+                if (digits.length() <= 6)
+                    return digits.substring(0, 4) + "-" + digits.substring(4);
+                return digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6);
+            }
+        });
+
+        // ── Space/Enter triggers leading-zero padding ──────────────────────────
+        birthdateField.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
+                        || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                    e.consume();
+                    SwingUtilities.invokeLater(() -> applyDatePadAndFormat(birthdateField));
+                }
+            }
+        });
+
+        // ── Pad + validate on focus lost ───────────────────────────────────────
+        birthdateField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                applyDatePadAndFormat(birthdateField);
+                String text = birthdateField.getText().trim();
+                if (text.isEmpty() || text.length() < 10) return;
+                String error = validateDate(text);
+                if (error != null) {
+                    showError(error);
+                    SwingUtilities.invokeLater(() -> {
+                        setDateTextDirect(birthdateField, "");
+                        birthdateField.requestFocusInWindow();
+                    });
+                }
+            }
+        });
         r6.add(lf("Birthplace",               birthplaceField = tf()));
         r6.add(lf("Marital Status", maritalStatusBox = cb(new String[]{
                 "Select","Single","Married","Widowed","Legally Separated","Annulled"})));
@@ -717,6 +806,102 @@ public class MemberInfoFormView extends JPanel {
         JLabel l = new JLabel(label); l.setForeground(new Color(255, 255, 255, 180));
         l.setFont(new Font("Arial", Font.BOLD, 11));
         p.add(l, BorderLayout.NORTH); p.add(field, BorderLayout.CENTER); return p;
+    }
+    
+ // ── Auto-pad month/day with a leading zero if single-digit ───────────────
+    private void applyDatePadAndFormat(JTextField f) {
+        String raw = f.getText().replaceAll("[^0-9]", "");
+        if (raw.isEmpty()) return;
+
+        String year = raw.length() >= 4 ? raw.substring(0, 4) : raw;
+        String rest = raw.length() >  4 ? raw.substring(4)    : "";
+
+        if (rest.length() == 1) {
+            rest = "0" + rest;
+        } else if (rest.length() == 3) {
+            if (rest.charAt(0) == '0') {
+                rest = rest.substring(0, 2) + "0" + rest.substring(2);
+            } else {
+                rest = "0" + rest;
+            }
+        }
+
+        String padded = year + rest;
+        StringBuilder formatted = new StringBuilder();
+        for (int i = 0; i < padded.length(); i++) {
+            if (i == 4 || i == 6) formatted.append("-");
+            formatted.append(padded.charAt(i));
+        }
+
+        if (!formatted.toString().equals(f.getText())) {
+            AbstractDocument doc = (AbstractDocument) f.getDocument();
+            DocumentFilter filter = doc.getDocumentFilter();
+            doc.setDocumentFilter(null);
+            f.setText(formatted.toString());
+            doc.setDocumentFilter(filter);
+            int len = f.getDocument().getLength();
+            f.setCaretPosition(Math.min(formatted.length(), len));
+        }
+    }
+
+    // ── Full date validation ──────────────────────────────────────────────────
+    private String validateDate(String dateStr) {
+        if (dateStr == null || !dateStr.matches("\\d{4}-\\d{2}-\\d{2}"))
+            return "Date must be in YYYY-MM-DD format.";
+
+        int year, month, day;
+        try {
+            year  = Integer.parseInt(dateStr.substring(0, 4));
+            month = Integer.parseInt(dateStr.substring(5, 7));
+            day   = Integer.parseInt(dateStr.substring(8, 10));
+        } catch (NumberFormatException e) {
+            return "Date must be in YYYY-MM-DD format.";
+        }
+
+        int currentYear = java.time.LocalDate.now().getYear();
+
+        if (year < 1900 || year > currentYear)
+            return "Year must be between 1900 and " + currentYear + ".";
+
+        if (month < 1 || month > 12)
+            return "Month must be between 01 and 12.";
+
+        final int maxDays;
+        switch (month) {
+            case 1: case 3: case 5: case 7:
+            case 8: case 10: case 12: maxDays = 31; break;
+            case 4: case 6: case 9: case 11: maxDays = 30; break;
+            case 2:
+                boolean isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+                maxDays = isLeap ? 29 : 28; break;
+            default: return "Month must be between 01 and 12.";
+        }
+
+        if (day < 1 || day > maxDays)
+            return "Day must be between 01 and " + maxDays
+                   + (month == 2 ? " for " + year + " (February)." : " for the selected month.");
+
+        try {
+            java.time.LocalDate entered = java.time.LocalDate.of(year, month, day);
+            if (entered.isAfter(java.time.LocalDate.now()))
+                return "Birthdate cannot be in the future.";
+        } catch (java.time.DateTimeException e) {
+            return "Invalid date. Please check the day, month, and year.";
+        }
+
+        return null;
+    }
+
+    // ── Set date text bypassing the document filter ───────────────────────────
+    private void setDateTextDirect(JTextField field, String value) {
+        AbstractDocument doc = (AbstractDocument) field.getDocument();
+        DocumentFilter existing = doc.getDocumentFilter();
+        try {
+            doc.setDocumentFilter(null);
+            field.setText(value);
+        } finally {
+            doc.setDocumentFilter(existing);
+        }
     }
 
     // ── Text field ─────────────────────────────────────────────────────────────
