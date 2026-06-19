@@ -285,6 +285,15 @@ public class HeirsFormView extends JPanel {
         HeirsDAO dao = new HeirsDAO();
         List<HeirsTable> saved = dao.getHeirsByMID(loggedInMid);
 
+        // Clear existing UI state before repopulating — otherwise records
+        // loaded from the DB get appended on top of whatever is already in
+        // listPanel/entries (e.g. right after handleSave() calls this while
+        // the edit-session entries are still present), which is what causes
+        // the display to show duplicated rows until the form is reopened.
+        listPanel.removeAll();
+        entries.clear();
+        heirCount = 0;
+
         if (saved.isEmpty()) {
             JLabel noData = new JLabel("No heirs or dependents on record.");
             noData.setForeground(new Color(255, 255, 255, 150));

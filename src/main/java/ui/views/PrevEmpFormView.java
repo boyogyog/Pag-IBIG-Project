@@ -192,14 +192,21 @@ public class PrevEmpFormView extends JPanel {
         });
 
         editSaveBtn.addActionListener(e -> {
-            if (!editMode) {
-                editMode = true;
-                editSaveBtn.setText("Save Changes");
-                unlockAllEntries();
-            } else {
-                handleSave();
+        if (!editMode) {
+            editMode = true;
+            editSaveBtn.setText("Save Changes");
+            // Remove the "No previous employment records found." placeholder, if present,
+            // so it doesn't linger above newly-added entries.
+            if (entries.isEmpty()) {
+                listPanel.removeAll();
+                listPanel.revalidate();
+                listPanel.repaint();
             }
-        });
+            unlockAllEntries();
+        } else {
+            handleSave();
+        }
+    });
 
         deleteBtn.addActionListener(e -> {
             int choice = JOptionPane.showConfirmDialog(PrevEmpFormView.this,
@@ -414,8 +421,14 @@ public class PrevEmpFormView extends JPanel {
         lockAllEntries();
     }
 
-    // ── Load from DB ──────────────────────────────────────────────────────────
-    private void loadFromDatabase() {
+        // ── Load from DB ──────────────────────────────────────────────────────────
+        public void loadFromDatabase() {
+        // ── Clear existing state first so re-entering this view never stacks duplicate rows ──
+        entries.clear();
+        listPanel.removeAll();
+        listPanel.revalidate();
+        listPanel.repaint();
+
         if (loggedInMID == null || loggedInMID.isEmpty()) {
             addEntry(1, "No MID provided", "N/A", "N/A", "N/A", 0);
             return;
@@ -453,6 +466,8 @@ public class PrevEmpFormView extends JPanel {
         }
 
         lockAllEntries();
+        editMode = false;
+        editSaveBtn.setText("Edit");
     }
 
     private void addEntry(int number, String mid, String company,
@@ -1001,7 +1016,8 @@ public class PrevEmpFormView extends JPanel {
         field.setFont(new Font("Arial", Font.PLAIN, 14));
         field.setBorder(new EmptyBorder(10, 14, 10, 14));
         field.setEditable(false);
-        field.setFocusable(false);
+        field.setFocusable(true);   // explicit: field must stay focusable even while locked,
+                                    // otherwise setEditable(true) later won't restore typing
         field.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) { field.repaint(); }
             public void focusLost(FocusEvent e)   { field.repaint(); }

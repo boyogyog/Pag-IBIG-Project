@@ -148,9 +148,21 @@ public class MemberInfoForm extends JFrame {
         if (mid == null || mid.isEmpty()) return;
 
         MemberDAO dao = new MemberDAO();
-        MemberTable existing = dao.getMemberById(mid);
-        if (existing == null) existing = RegistrationSession.getInstance().getMemberData();
+        MemberTable dbRecord      = dao.getMemberById(mid);
+        MemberTable sessionRecord = RegistrationSession.getInstance().getMemberData();
+
+        MemberTable existing = dbRecord != null ? dbRecord : sessionRecord;
         if (existing == null) return;
+
+        // If the DB record is missing the cellphone number but the in-memory
+        // session record has it (e.g. saved this session but not yet re-fetched
+        // correctly from DB), prefer the session's phone number.
+        if ((existing.getCellphoneNum() == null || existing.getCellphoneNum().trim().isEmpty())
+                && sessionRecord != null
+                && sessionRecord.getCellphoneNum() != null
+                && !sessionRecord.getCellphoneNum().trim().isEmpty()) {
+            existing = sessionRecord;
+        }
 
         recordExists = true;
 
@@ -168,15 +180,28 @@ public class MemberInfoForm extends JFrame {
         setText(permanentHomeAddressField, existing.getPermanentHomeAddress());
         setText(homeTelNumField,           existing.getHomeTelNum());
 
-        String rawPhone = existing.getCellphoneNum();
-        if (rawPhone != null && !rawPhone.isEmpty()) {
+    String rawPhone = existing.getCellphoneNum();
+    if (rawPhone == null) rawPhone = "";
+    if (!rawPhone.isEmpty()) {
             String digits = rawPhone.replaceAll("[^0-9]", "");
+
+            // The phone field's DocumentFilter blocks any setText() call because
+            // setText() triggers a replace() starting at offset 0, which the filter
+            // always rejects (it only allows edits typed after the "(+63) " prefix).
+            // Temporarily remove the filter so the saved number can be restored.
+            javax.swing.text.AbstractDocument phoneDoc =
+                    (javax.swing.text.AbstractDocument) cellphoneNumField.getDocument();
+            javax.swing.text.DocumentFilter phoneFilter = phoneDoc.getDocumentFilter();
+            phoneDoc.setDocumentFilter(null);
+
             if (digits.length() == 10) {
                 cellphoneNumField.setText("(+63) " + digits.substring(0, 3)
                         + " " + digits.substring(3, 6) + " " + digits.substring(6));
             } else {
                 cellphoneNumField.setText("(+63) ");
             }
+
+            phoneDoc.setDocumentFilter(phoneFilter);
         }
 
         setText(busDirectLineField,    existing.getBusDirectLine());
@@ -421,7 +446,9 @@ public class MemberInfoForm extends JFrame {
 
         String frequency      = (String) frequencyOfMembershipSavingsBox.getSelectedItem();
         String mailingAddress = toMailingEnum((String) preferredMailingAddressBox.getSelectedItem());
-        String rawPhone       = cellphoneNumField.getText().replaceAll("[^0-9]", "");
+        String fieldText = cellphoneNumField.getText();
+        String afterPrefix = fieldText.length() > 6 ? fieldText.substring(6) : ""; // strip "(+63) "
+        String rawPhone = afterPrefix.replaceAll("[^0-9]", "");
 
         BigDecimal allowBasic  = parseBigDecimal(allowBasicField.getText());
         BigDecimal allowOther  = parseBigDecimal(allowOtherSourcesField.getText());

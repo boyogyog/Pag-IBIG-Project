@@ -61,7 +61,7 @@ public class CurrentEmpFormView extends JPanel {
     private JButton deleteBtn;
     private List<CompanyDetailsTable> companyList;
 
-    private JPanel contentArea;
+    private ScrollableContentPanel contentArea;
 
     public CurrentEmpFormView(String mid) {
         this.loggedInMID = mid;
@@ -106,6 +106,7 @@ public class CurrentEmpFormView extends JPanel {
             }
         };
         card.setOpaque(false);
+        card.setPreferredSize(new Dimension(900, 640));
         card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(40, 45, 35, 45));
 
@@ -135,7 +136,7 @@ public class CurrentEmpFormView extends JPanel {
         companyList = new CompanyDAO().getAllCompanies();
 
         // ── Content area ──────────────────────────────────────────────────────
-        contentArea = new JPanel();
+        contentArea = new ScrollableContentPanel();
         contentArea.setLayout(new BoxLayout(contentArea, BoxLayout.Y_AXIS));
         contentArea.setOpaque(false);
         contentArea.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -328,7 +329,9 @@ public class CurrentEmpFormView extends JPanel {
         scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.setPreferredSize(new Dimension(0, 420));
+        scroll.setPreferredSize(new Dimension(800, 420));
+        scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 420));
+        scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         scroll.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
             @Override protected void configureScrollBarColors() {
@@ -735,16 +738,16 @@ public class CurrentEmpFormView extends JPanel {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(new Color(255,255,255,10));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),12,12);
+                g2.fillRoundRect(0,0,getWidth(),getHeight(),10,10);
                 g2.setColor(isFocusOwner() ? new Color(96,216,164,180) : new Color(255,255,255,35));
                 g2.setStroke(new BasicStroke(1.5f));
-                g2.drawRoundRect(0,0,getWidth()-1,getHeight()-1,12,12);
+                g2.drawRoundRect(0,0,getWidth()-1,getHeight()-1,10,10);
                 g2.dispose(); super.paintComponent(g);
             }
         };
         field.setOpaque(false); field.setForeground(new Color(220,220,220));
-        field.setCaretColor(Color.WHITE); field.setFont(new Font("Arial",Font.PLAIN,15));
-        field.setBorder(new EmptyBorder(10,14,10,14));
+        field.setCaretColor(Color.WHITE); field.setFont(new Font("Arial",Font.PLAIN,14));
+        field.setBorder(new EmptyBorder(8,12,8,12));
         field.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) { field.repaint(); }
             public void focusLost(FocusEvent e)   { field.repaint(); }
@@ -775,7 +778,7 @@ public class CurrentEmpFormView extends JPanel {
         };
         box.setOpaque(false); box.setBackground(new Color(0,0,0,0));
         box.setForeground(new Color(225,225,225)); box.setFont(new Font("Arial",Font.PLAIN,14));
-        box.setBorder(new EmptyBorder(8,12,8,8)); box.setFocusable(true);
+        box.setBorder(new EmptyBorder(6,12,6,8)); box.setFocusable(true);
 
         SwingUtilities.invokeLater(() -> {
             Component ed = box.getEditor().getEditorComponent();
@@ -880,7 +883,21 @@ public class CurrentEmpFormView extends JPanel {
 
     private JPanel row(int cols) {
         JPanel p = new JPanel(new GridLayout(1,cols,18,0)); p.setOpaque(false);
-        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
+        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75));
         p.setAlignmentX(Component.LEFT_ALIGNMENT); return p;
+    }
+
+    // =========================================================================
+    // SCROLLABLE CONTENT PANEL
+    // Tracks viewport width so rows shrink-to-fit instead of clipping
+    // horizontally, while reporting its own preferred height so the
+    // JScrollPane scrolls vertically as needed.
+    // =========================================================================
+    private static class ScrollableContentPanel extends JPanel implements Scrollable {
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle visibleRect, int orientation, int direction) { return 16; }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle visibleRect, int orientation, int direction) { return 100; }
     }
 }

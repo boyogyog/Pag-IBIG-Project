@@ -279,16 +279,22 @@ public class PrevEmpForm extends JPanel {
             	}
             	companyCode = match.getCompanyCode();
 
-            	if (match == null) {
-            	    showError("Entry " + entryNum + ": Could not resolve company. Please re-select."); return;
-            	}
-            	companyCode = match.getCompanyCode();
             }
 
-            // ── Insert prev emp record ────────────────────────────────────────
-            PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
-            if (!dao.insertPrevEmp(record)) {
-                showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
+            // ── Insert or update prev emp record ──────────────────────────────
+            if (entry.prevEmpCode > 0) {
+                // Already exists in DB — update in place instead of re-inserting.
+                PrevEmpTable record = new PrevEmpTable(mid, entry.prevEmpCode, companyCode, toDate, fromDate);
+                if (!dao.updatePrevEmp(record)) {
+                    showError("Entry " + entryNum + ": Failed to update. Please try again."); return;
+                }
+            } else {
+                // Brand new entry — insert and capture the generated id so a second
+                // Save click on the same form (without reopening) won't re-insert it.
+                PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
+                if (!dao.insertPrevEmp(record)) {
+                    showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
+                }
             }
         }
 
@@ -429,6 +435,7 @@ public class PrevEmpForm extends JPanel {
         empCount++;
         PrevEmpEntry entry = new PrevEmpEntry(empCount, this);
         entries.add(entry);
+        entry.prevEmpCode = record.getPrevEmpCode();
 
         // Set company dropdown
         for (int i = 0; i < companyDisplayItems.length; i++) {
@@ -490,6 +497,9 @@ public class PrevEmpForm extends JPanel {
         public JComboBox<String> companyBox;
         public JTextField fromDateField;
         public JTextField toDateField;
+
+        // 0 = new entry (not yet in DB). > 0 = existing DB row, loaded from getPrevEmpByMID().
+        public int prevEmpCode = 0;
 
         // New company fields (hidden by default)
         public JTextField        newCompanyNameField;
