@@ -71,7 +71,7 @@ public class MemberRecordForm extends JFrame {
     public JComboBox<String> membershipTypeBox, membershipCategoryBox, occupationalStatusBox, frequencyBox;
     public JComboBox<String> preferredMailBox, maritalStatusBox, citizenshipBox, sexBox;
 
-    // "Other Earning Groups" free-text field — shown when that category is selected
+    // "Other Earning Groups" free-text field
     public JTextField membershipCategoryOtherEarningField;
     private JPanel    membershipCategoryOtherEarningPanel;
 
@@ -80,11 +80,9 @@ public class MemberRecordForm extends JFrame {
     public JComboBox<String> curCompanyBox, curEmpStatusBox, curTypeOfWorkBox, curCountryBox;
     private List<CompanyDetailsTable> companyList;
 
-    // Country of Assignment free-text field — shown when "Other" is selected
     private JTextField curCountryOthersField;
     private JPanel     curCountryOthersPanel;
 
-    // Country of Assignment options — full list vs. OFW-only list (Philippines excluded)
     private static final String[] COUNTRY_OPTIONS_ALL = {
             "Select", "Philippines", "Saudi Arabia", "United Arab Emirates",
             "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
@@ -93,6 +91,14 @@ public class MemberRecordForm extends JFrame {
             "Select", "Saudi Arabia", "United Arab Emirates",
             "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
     };
+
+    // ── Current Employment state ──────────────────────────────────────────────
+    private boolean curEmpExists     = false;
+    private JPanel  curEmpArea;
+    private JPanel  curEmpSubCard;
+    private JPanel  curEmpPlaceholder;
+    private JButton addCurEmpBtn;
+    private JButton removeCurEmpBtn;
 
     // ── Previous Employment ───────────────────────────────────────────────────
     private JPanel prevEmpListPanel;
@@ -223,9 +229,6 @@ public class MemberRecordForm extends JFrame {
 
     // =========================================================================
     // VALIDATE DATE
-    // Returns null if valid, or an error message string if invalid.
-    // future — pass false to allow future dates (e.g. no restriction),
-    //          pass true to block dates after today.
     // =========================================================================
     private String validateDate(String dateStr, boolean blockFuture, String fieldLabel) {
         if (dateStr == null || !dateStr.matches("\\d{4}-\\d{2}-\\d{2}"))
@@ -241,10 +244,8 @@ public class MemberRecordForm extends JFrame {
         }
 
         int currentYear = java.time.LocalDate.now().getYear();
-
         if (year < 1900 || year > currentYear)
             return fieldLabel + ": Year must be between 1900 and " + currentYear + ".";
-
         if (month < 1 || month > 12)
             return fieldLabel + ": Month must be between 01 and 12.";
 
@@ -271,21 +272,16 @@ public class MemberRecordForm extends JFrame {
             return fieldLabel + ": Invalid date. Please check the day, month, and year.";
         }
 
-        return null; // valid
+        return null;
     }
 
-    // ── Convenience: attach focusLost validation to any date field ────────────
-    // blockFuture = true  → date cannot be after today
-    // blockFuture = false → future dates are allowed (e.g. "to date" still in progress isn't blocked)
     private void attachDateValidation(JTextField field, boolean blockFuture, String fieldLabel) {
         field.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
-                applyDatePadAndFormat(field); // pad single-digit month/day first
-
+                applyDatePadAndFormat(field);
                 String text = field.getText().trim();
-                if (text.isEmpty() || text.length() < 10) return; // let save catch incomplete
-
+                if (text.isEmpty() || text.length() < 10) return;
                 String error = validateDate(text, blockFuture, fieldLabel);
                 if (error != null) {
                     showError(error);
@@ -313,7 +309,6 @@ public class MemberRecordForm extends JFrame {
         if (m != null) {
             pagIbigMidNoField.setText(safe(m.getPagIbigMIDNo()));
 
-            // ── Membership Type — value may be a recognized type or free-text "Others" ──
             String dbType = safe(m.getMembershipType());
             if (!dbType.isEmpty()) {
                 String uiType = fromDbMembershipType(dbType);
@@ -326,7 +321,6 @@ public class MemberRecordForm extends JFrame {
                 }
             }
 
-            // ── Membership Category — filtered list driven by Membership Type above ──
             String dbCat = safe(m.getMembershipCategory());
             if (!dbCat.isEmpty()) {
                 String uiCat = fromDbMembershipCategory(dbCat);
@@ -341,8 +335,6 @@ public class MemberRecordForm extends JFrame {
                 }
             }
 
-            // Membership Category determines whether Current Employment's
-            // Country of Assignment / Type of Work are open to OFW-only options.
             applyOfwGate();
 
             setCombo(occupationalStatusBox,  m.getOccupationalStatus());
@@ -374,25 +366,25 @@ public class MemberRecordForm extends JFrame {
             totalIncomeField.setText(m.getTotalMoIncome() != null ? m.getTotalMoIncome().toPlainString() : "");
         } else {
             showError("No member record found for MID: " + loggedInMID);
-            // No membership data at all — make sure the OFW gate defaults closed.
             applyOfwGate();
         }
 
+        // ── Current Employment ────────────────────────────────────────────────
         CurrentEmpRecordTable cur = new CurrentEmpDAO().getCurrentEmpByMID(loggedInMID);
         if (cur != null) {
+            curEmpExists = true;
+            curEmpArea.remove(curEmpPlaceholder);
+            curEmpArea.add(curEmpSubCard, 0);
+
             curOccupationField.setText(safe(cur.getOccupation()));
             curDateEmpField.setText(cur.getDateEmployed() != null ? cur.getDateEmployed().toString() : "");
-            setCombo(curEmpStatusBox,  cur.getEmploymentStatus());
+            setCombo(curEmpStatusBox, cur.getEmploymentStatus());
 
-            // ── Country of Assignment — matched against the gate-filtered list,
-            //    falling back to the free-text "Other" field if unrecognized ──
             String savedCountry = cur.getCountryOfAssignment();
             boolean knownCountry = false;
             if (savedCountry != null) {
                 for (int i = 0; i < curCountryBox.getItemCount(); i++) {
-                    if (curCountryBox.getItemAt(i).equals(savedCountry)) {
-                        knownCountry = true; break;
-                    }
+                    if (curCountryBox.getItemAt(i).equals(savedCountry)) { knownCountry = true; break; }
                 }
             }
             if (knownCountry) {
@@ -410,8 +402,13 @@ public class MemberRecordForm extends JFrame {
                     curCompanyBox.setSelectedIndex(i); break;
                 }
             }
+            curEmpArea.revalidate();
+            curEmpArea.repaint();
+        } else {
+            curEmpExists = false;
         }
 
+        // ── Previous Employment ───────────────────────────────────────────────
         List<PrevEmpTable> prevList = new PrevEmpDAO().getPrevEmpByMID(loggedInMID);
         for (PrevEmpTable rec : prevList) {
             String companyDisplay = rec.getCompanyCode();
@@ -426,6 +423,7 @@ public class MemberRecordForm extends JFrame {
                 rec.getToDate()   != null ? rec.getToDate().toString()   : "");
         }
 
+        // ── Heirs ─────────────────────────────────────────────────────────────
         List<HeirsTable> heirList = new HeirsDAO().getHeirsByMID(loggedInMID);
         for (HeirsTable h : heirList) {
             addHeir(h.getHeirsName(),
@@ -442,7 +440,6 @@ public class MemberRecordForm extends JFrame {
         if (birthdateField.getText().trim().isEmpty())  { showError("Birthdate is required.");   return; }
         if (cellphoneField.getText().trim().isEmpty())  { showError("Cellphone is required.");   return; }
 
-        // ── Validate member birthdate ─────────────────────────────────────────
         String bdError = validateDate(birthdateField.getText().trim(), true, "Birthdate");
         if (bdError != null) { showError(bdError); return; }
         Date birthdate = Date.valueOf(birthdateField.getText().trim());
@@ -454,7 +451,6 @@ public class MemberRecordForm extends JFrame {
             : toMembershipTypeEnum((String) membershipTypeBox.getSelectedItem());
         m.setMembershipType(mType);
 
-        // ── Membership Category: if "Other Earning Groups", optionally store custom text ──
         String selectedCat = (String) membershipCategoryBox.getSelectedItem();
         String membershipCatDb;
         if ("Other Earning Groups".equals(selectedCat)) {
@@ -496,51 +492,49 @@ public class MemberRecordForm extends JFrame {
 
         if (!new MemberDAO().updateMember(m)) { showError("Failed to save member info."); return; }
 
-        if (!"Select".equals(curCompanyBox.getSelectedItem()) &&
-            !curOccupationField.getText().trim().isEmpty()) {
+        // ── Current Employment — always delete first, then re-insert if exists ─
+        new CurrentEmpDAO().deleteCurrentEmpByMID(loggedInMID);
 
-            // ── Validate current employment date ──────────────────────────────
-            String curDateText = curDateEmpField.getText().trim();
-            Date dateEmp = null;
-            if (!curDateText.isEmpty()) {
-                String curDateError = validateDate(curDateText, true, "Date Employed");
-                if (curDateError != null) { showError(curDateError); return; }
-                dateEmp = Date.valueOf(curDateText);
+        if (curEmpExists) {
+            if (!"Select".equals(curCompanyBox.getSelectedItem()) &&
+                !curOccupationField.getText().trim().isEmpty()) {
+
+                String curDateText = curDateEmpField.getText().trim();
+                Date dateEmp = null;
+                if (!curDateText.isEmpty()) {
+                    String curDateError = validateDate(curDateText, true, "Date Employed");
+                    if (curDateError != null) { showError(curDateError); return; }
+                    dateEmp = Date.valueOf(curDateText);
+                }
+
+                String sel = (String) curCompanyBox.getSelectedItem();
+                String compCode = sel.substring(sel.lastIndexOf("(") + 1, sel.lastIndexOf(")"));
+
+                String curCountry = (String) curCountryBox.getSelectedItem();
+                if ("Other".equals(curCountry)) {
+                    curCountry = curCountryOthersField.getText().trim();
+                    if (curCountry.isEmpty()) { showError("Please specify the Country of Assignment."); return; }
+                }
+
+                boolean curIsOfw = "Overseas Filipino Worker".equals(membershipCategoryBox.getSelectedItem());
+                if (curIsOfw && "Select".equals(curTypeOfWorkBox.getSelectedItem())) {
+                    showError("Please select a Type of Work for OFW assignments."); return;
+                }
+
+                String tow = "Select".equals(curTypeOfWorkBox.getSelectedItem()) ? null
+                           : (String) curTypeOfWorkBox.getSelectedItem();
+
+                CurrentEmpRecordTable curRec = new CurrentEmpRecordTable(
+                    loggedInMID, compCode,
+                    curOccupationField.getText().trim(),
+                    (String) curEmpStatusBox.getSelectedItem(),
+                    tow, curCountry, dateEmp);
+                new CurrentEmpDAO().insertCurrentEmp(curRec);
             }
-
-            String sel = (String) curCompanyBox.getSelectedItem();
-            String compCode = sel.substring(sel.lastIndexOf("(") + 1, sel.lastIndexOf(")"));
-
-            // ── Country of Assignment — resolve free-text "Other" value ────────
-            String curCountry = (String) curCountryBox.getSelectedItem();
-            if ("Other".equals(curCountry)) {
-                curCountry = curCountryOthersField.getText().trim();
-                if (curCountry.isEmpty()) { showError("Please specify the Country of Assignment."); return; }
-            }
-
-            // ── Type of Work is only meaningful (and required) for OFW members ──
-            boolean curIsOfw = "Overseas Filipino Worker".equals(membershipCategoryBox.getSelectedItem());
-            if (curIsOfw && "Select".equals(curTypeOfWorkBox.getSelectedItem())) {
-                showError("Please select a Type of Work for OFW assignments.");
-                return;
-            }
-
-            String tow = "Select".equals(curTypeOfWorkBox.getSelectedItem()) ? null
-                       : (String) curTypeOfWorkBox.getSelectedItem();
-
-            CurrentEmpRecordTable cur = new CurrentEmpRecordTable(
-                loggedInMID, compCode,
-                curOccupationField.getText().trim(),
-                (String) curEmpStatusBox.getSelectedItem(),
-                tow,
-                curCountry,
-                dateEmp);
-
-            CurrentEmpDAO curDao = new CurrentEmpDAO();
-            if (curDao.getCurrentEmpByMID(loggedInMID) != null) curDao.updateCurrentEmp(cur);
-            else curDao.insertCurrentEmp(cur);
         }
+        // If !curEmpExists, the deleteCurrentEmpByMID above already handled removal.
 
+        // ── Previous Employment ───────────────────────────────────────────────
         PrevEmpDAO prevDao = new PrevEmpDAO();
         prevDao.deleteAllPrevEmpByMID(loggedInMID);
         for (int i = 0; i < prevEmpEntries.size(); i++) {
@@ -552,7 +546,6 @@ public class MemberRecordForm extends JFrame {
             String fromText = entry.fromField.getText().trim();
             String toText   = entry.toField.getText().trim();
 
-            // ── Validate prev emp from date ───────────────────────────────────
             Date fromDate = null;
             if (!fromText.isEmpty()) {
                 String fromError = validateDate(fromText, true, "Previous Employer " + (i + 1) + " From Date");
@@ -560,7 +553,6 @@ public class MemberRecordForm extends JFrame {
                 fromDate = Date.valueOf(fromText);
             }
 
-            // ── Validate prev emp to date (future allowed — could still be employed) ──
             Date toDate = null;
             if (!toText.isEmpty()) {
                 String toError = validateDate(toText, false, "Previous Employer " + (i + 1) + " To Date");
@@ -568,7 +560,6 @@ public class MemberRecordForm extends JFrame {
                 toDate = Date.valueOf(toText);
             }
 
-            // ── Validate from < to if both are provided ───────────────────────
             if (fromDate != null && toDate != null && !fromDate.before(toDate)) {
                 showError("Previous Employer " + (i + 1) + ": From Date must be before To Date.");
                 return;
@@ -577,6 +568,7 @@ public class MemberRecordForm extends JFrame {
             prevDao.insertPrevEmp(new PrevEmpTable(loggedInMID, 0, code, toDate, fromDate));
         }
 
+        // ── Heirs ─────────────────────────────────────────────────────────────
         HeirsDAO heirsDao = new HeirsDAO();
         heirsDao.deleteHeirsByMID(loggedInMID);
         for (int i = 0; i < heirEntries.size(); i++) {
@@ -586,17 +578,14 @@ public class MemberRecordForm extends JFrame {
             String dob  = entry.birthdateField.getText().trim();
             if (name.isEmpty() || "Select".equals(rel)) continue;
 
-            // ── Relationship: resolve free-text "Other" value ─────────────────
             if ("Other".equals(rel)) {
                 String customRel = entry.relationshipOthersField.getText().trim();
                 if (customRel.isEmpty()) {
-                    showError("Heir " + (i + 1) + ": Please specify the relationship.");
-                    return;
+                    showError("Heir " + (i + 1) + ": Please specify the relationship."); return;
                 }
                 rel = customRel;
             }
 
-            // ── Validate heir birthdate ───────────────────────────────────────
             Date birthDate = null;
             if (!dob.isEmpty()) {
                 String heirDateError = validateDate(dob, true, "Heir " + (i + 1) + " Birthdate");
@@ -620,8 +609,8 @@ public class MemberRecordForm extends JFrame {
         c.setLayout(new BoxLayout(c, BoxLayout.Y_AXIS));
         c.setBorder(new EmptyBorder(20, 0, 20, 0));
 
+        // ── Membership Information ────────────────────────────────────────────
         c.add(sectionHeader("Membership Information")); c.add(vgap(14));
-        // AFTER — Others field hidden by default, shown only when "Others" is selected
         JPanel r1 = row(2);
         r1.add(lf("Pag-IBIG MID No.", pagIbigMidNoField = tf("")));
         r1.add(lf("Membership Type",  membershipTypeBox  = cb(new String[]{
@@ -629,7 +618,6 @@ public class MemberRecordForm extends JFrame {
         pagIbigMidNoField.setEditable(false);
         c.add(r1); c.add(vgap(8));
 
-        // Others panel — hidden by default
         membershipTypeOthersField = tf("");
         membershipTypeOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
         membershipTypeOthersPanel.setOpaque(false);
@@ -639,7 +627,6 @@ public class MemberRecordForm extends JFrame {
         membershipTypeOthersPanel.setVisible(false);
         c.add(membershipTypeOthersPanel); c.add(vgap(8));
 
-        // Listener to show/hide + cascade the Membership Category filter
         membershipTypeBox.addActionListener(e -> {
             boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
             membershipTypeOthersPanel.setVisible(show);
@@ -649,15 +636,12 @@ public class MemberRecordForm extends JFrame {
         });
 
         JPanel r2 = row(2);
-        // Membership Category options are filtered based on Membership Type —
-        // start with just "Select" until a type cascades the real options in.
         r2.add(lf("Membership Category", membershipCategoryBox = cb(new String[]{"Select"})));
         membershipCategoryBox.setEnabled(false);
         r2.add(lf("Occupational Status", occupationalStatusBox = cb(new String[]{
                 "Select","Employed","Unemployed","First Time Jobseeker"})));
         c.add(r2); c.add(vgap(8));
 
-        // "Other Earning Groups" panel for Membership Category — hidden by default
         membershipCategoryOtherEarningField = tf("");
         membershipCategoryOtherEarningPanel = new JPanel(new GridLayout(1, 1, 0, 0));
         membershipCategoryOtherEarningPanel.setOpaque(false);
@@ -667,7 +651,6 @@ public class MemberRecordForm extends JFrame {
         membershipCategoryOtherEarningPanel.setVisible(false);
         c.add(membershipCategoryOtherEarningPanel); c.add(vgap(8));
 
-        // Listener to show/hide + re-evaluate the OFW gate on Current Employment
         membershipCategoryBox.addActionListener(e -> {
             boolean show = "Other Earning Groups".equals(membershipCategoryBox.getSelectedItem());
             membershipCategoryOtherEarningPanel.setVisible(show);
@@ -682,6 +665,7 @@ public class MemberRecordForm extends JFrame {
         r3.add(lf("CRN", crnField = tf("")));
         c.add(r3); c.add(vgap(26));
 
+        // ── Personal Information ──────────────────────────────────────────────
         c.add(sectionHeader("Personal Information")); c.add(vgap(14));
         JPanel r4 = row(1); r4.add(lf("Member Name *", memberNameField = tf(""))); c.add(r4); c.add(vgap(16));
 
@@ -692,7 +676,6 @@ public class MemberRecordForm extends JFrame {
         c.add(r5); c.add(vgap(16));
 
         JPanel r6 = row(3);
-        // ── Birthdate: attach focusLost validation ────────────────────────────
         birthdateField = tfDate();
         attachDateValidation(birthdateField, true, "Birthdate");
         r6.add(lf("Birthdate (YYYY-MM-DD) *", birthdateField));
@@ -707,12 +690,14 @@ public class MemberRecordForm extends JFrame {
         r7.add(lf("Employee No.", employeeNumField = tf("")));
         c.add(r7); c.add(vgap(26));
 
+        // ── Government IDs ────────────────────────────────────────────────────
         c.add(sectionHeader("Government IDs")); c.add(vgap(14));
         JPanel r8 = row(2);
         r8.add(lf("TIN",     tinField = tf("")));
         r8.add(lf("SSS No.", sssField = tf("")));
         c.add(r8); c.add(vgap(26));
 
+        // ── Address Information ───────────────────────────────────────────────
         c.add(sectionHeader("Address Information")); c.add(vgap(14));
         JPanel r9 = row(1); r9.add(lf("Present Home Address *", presentAddrField = tf(""))); c.add(r9); c.add(vgap(16));
         JPanel r10 = row(1); r10.add(lf("Permanent Home Address *", permanentAddrField = tf(""))); c.add(r10); c.add(vgap(16));
@@ -721,6 +706,7 @@ public class MemberRecordForm extends JFrame {
                 "Select","Present Home Address","Permanent Home Address","Employer/Business Address"})));
         c.add(r11); c.add(vgap(26));
 
+        // ── Contact Information ───────────────────────────────────────────────
         c.add(sectionHeader("Contact Information")); c.add(vgap(14));
         JPanel r12 = row(3);
         r12.add(lf("Cellphone No. *", cellphoneField = tf("")));
@@ -734,6 +720,7 @@ public class MemberRecordForm extends JFrame {
         r13.add(lf("Local/Extension",      localField     = tf("")));
         c.add(r13); c.add(vgap(26));
 
+        // ── Income Information ────────────────────────────────────────────────
         c.add(sectionHeader("Income Information")); c.add(vgap(14));
         JPanel r14 = row(3);
         r14.add(lf("Basic Allowance *",    allowBasicField  = tf("")));
@@ -755,37 +742,74 @@ public class MemberRecordForm extends JFrame {
         allowOtherField.addFocusListener(income);
         c.add(vgap(26));
 
+        // ── Current Employment Record ─────────────────────────────────────────
         c.add(sectionHeader("Current Employment Record")); c.add(vgap(14));
 
-        String[] companyItems = buildCompanyItems();
-        JPanel r15 = row(2);
+        curEmpArea = new JPanel();
+        curEmpArea.setLayout(new BoxLayout(curEmpArea, BoxLayout.Y_AXIS));
+        curEmpArea.setOpaque(false);
+        curEmpArea.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // Placeholder shown when no record exists
+        curEmpPlaceholder = new JPanel(new BorderLayout());
+        curEmpPlaceholder.setOpaque(false);
+        curEmpPlaceholder.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel noEmpLabel = new JLabel("No current employment record on file.");
+        noEmpLabel.setForeground(new Color(255, 255, 255, 150));
+        noEmpLabel.setFont(new Font("Arial", Font.ITALIC, 14));
+        curEmpPlaceholder.add(noEmpLabel, BorderLayout.WEST);
+
+        // Sub-card (same glass style as Previous Employer sub-cards)
+        curEmpSubCard = buildSubCard(accentGreen, 320);
+        curEmpSubCard.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel curEmpHdr = new JPanel(new BorderLayout()); curEmpHdr.setOpaque(false);
+        JLabel curEmpLbl = new JLabel("Current Employment");
+        curEmpLbl.setFont(new Font("Arial Black", Font.BOLD, 12));
+        curEmpLbl.setForeground(accentGreen);
+        removeCurEmpBtn = buildRemoveButton();
+        removeCurEmpBtn.addActionListener(e -> {
+            int choice = JOptionPane.showConfirmDialog(MemberRecordForm.this,
+                "Remove the current employment record?\nThis will be deleted when you Save All.",
+                "Confirm Remove", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (choice != JOptionPane.YES_OPTION) return;
+            curEmpExists = false;
+            curEmpArea.remove(curEmpSubCard);
+            curEmpArea.add(curEmpPlaceholder, 0);
+            addCurEmpBtn.setVisible(true);
+            curEmpArea.revalidate(); curEmpArea.repaint();
+        });
+        curEmpHdr.add(curEmpLbl,       BorderLayout.WEST);
+        curEmpHdr.add(removeCurEmpBtn, BorderLayout.EAST);
+        curEmpSubCard.add(curEmpHdr); curEmpSubCard.add(vgap(12));
+
+        // Fields inside sub-card
+        JPanel cr1 = row(2);
         JTextField curMidField = tf(loggedInMID != null ? loggedInMID : "");
         curMidField.setEditable(false);
-        r15.add(lf("PAG-IBIG MID NO.", curMidField));
-        curCompanyBox = new JComboBox<>(companyItems);
+        cr1.add(lf("PAG-IBIG MID NO.", curMidField));
+        curCompanyBox = new JComboBox<>(buildCompanyItems());
         curCompanyBox.setFont(new Font("Arial", Font.PLAIN, 13));
         curCompanyBox.setForeground(Color.WHITE);
         curCompanyBox.setBackground(new Color(25, 40, 65));
-        r15.add(lf("Company", curCompanyBox));
-        c.add(r15); c.add(vgap(16));
+        cr1.add(lf("Company", curCompanyBox));
+        curEmpSubCard.add(cr1); curEmpSubCard.add(vgap(10));
 
-        JPanel r16 = row(2);
-        r16.add(lf("Occupation", curOccupationField = tf("")));
-        // ── Current employment date: attach focusLost validation ──────────────
+        JPanel cr2 = row(2);
+        cr2.add(lf("Occupation", curOccupationField = tf("")));
         curDateEmpField = tfDate();
         attachDateValidation(curDateEmpField, true, "Date Employed");
-        r16.add(lf("Date Employed (YYYY-MM-DD)", curDateEmpField));
-        c.add(r16); c.add(vgap(16));
+        cr2.add(lf("Date Employed (YYYY-MM-DD)", curDateEmpField));
+        curEmpSubCard.add(cr2); curEmpSubCard.add(vgap(10));
 
-        JPanel r17 = row(3);
-        r17.add(lf("Employment Status", curEmpStatusBox = cb(new String[]{
+        JPanel cr3 = row(3);
+        cr3.add(lf("Employment Status", curEmpStatusBox = cb(new String[]{
                 "Select","PERMANENT/REGULAR","CASUAL","CONTRACTUAL","PROJECT BASED","PART-TIME/TEMPORARY"})));
-        r17.add(lf("Type of Work", curTypeOfWorkBox = cb(new String[]{
+        cr3.add(lf("Type of Work", curTypeOfWorkBox = cb(new String[]{
                 "Select","LAND-BASED","SEA-BASED"})));
-        r17.add(lf("Country of Assignment", curCountryBox = cb(COUNTRY_OPTIONS_ALL)));
-        c.add(r17); c.add(vgap(16));
+        cr3.add(lf("Country of Assignment", curCountryBox = cb(COUNTRY_OPTIONS_ALL)));
+        curEmpSubCard.add(cr3); curEmpSubCard.add(vgap(10));
 
-        // Country of Assignment "Other" specify panel — hidden by default
         curCountryOthersField = tf("");
         curCountryOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
         curCountryOthersPanel.setOpaque(false);
@@ -793,7 +817,7 @@ public class MemberRecordForm extends JFrame {
         curCountryOthersPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         curCountryOthersPanel.add(lf("Country of Assignment — please specify", curCountryOthersField));
         curCountryOthersPanel.setVisible(false);
-        c.add(curCountryOthersPanel); c.add(vgap(26));
+        curEmpSubCard.add(curCountryOthersPanel);
 
         curCountryBox.addActionListener(e -> {
             boolean isOther = "Other".equals(curCountryBox.getSelectedItem());
@@ -802,10 +826,33 @@ public class MemberRecordForm extends JFrame {
             c.revalidate(); c.repaint();
         });
 
-        // Current Employment starts gated closed (non-OFW) until membership
-        // data is loaded / a membership category is chosen above.
+        // "Add Current Employment" button — shown when no record exists
+        addCurEmpBtn = buildAddButton("+ Add Current Employment");
+        addCurEmpBtn.setVisible(false);
+        addCurEmpBtn.addActionListener(e -> {
+            curEmpExists = true;
+            curOccupationField.setText("");
+            curDateEmpField.setText("");
+            curCompanyBox.setSelectedIndex(0);
+            curEmpStatusBox.setSelectedIndex(0);
+            curTypeOfWorkBox.setSelectedIndex(0);
+            curCountryBox.setSelectedIndex(0);
+            curCountryOthersField.setText("");
+            curCountryOthersPanel.setVisible(false);
+            applyOfwGate();
+            curEmpArea.remove(curEmpPlaceholder);
+            curEmpArea.add(curEmpSubCard, 0);
+            addCurEmpBtn.setVisible(false);
+            curEmpArea.revalidate(); curEmpArea.repaint();
+        });
+
+        curEmpArea.add(curEmpPlaceholder);
+        c.add(curEmpArea); c.add(vgap(10));
+        c.add(addCurEmpBtn); c.add(vgap(26));
+
         applyOfwGate();
 
+        // ── Previous Employment Records ───────────────────────────────────────
         c.add(sectionHeader("Previous Employment Records")); c.add(vgap(14));
         prevEmpListPanel = new JPanel();
         prevEmpListPanel.setLayout(new BoxLayout(prevEmpListPanel, BoxLayout.Y_AXIS));
@@ -817,6 +864,7 @@ public class MemberRecordForm extends JFrame {
         addPrevBtn.addActionListener(e -> addPrevEmp("", "", ""));
         c.add(addPrevBtn); c.add(vgap(26));
 
+        // ── Heirs & Dependents ────────────────────────────────────────────────
         c.add(sectionHeader("Heirs & Dependents")); c.add(vgap(14));
         heirListPanel = new JPanel();
         heirListPanel.setLayout(new BoxLayout(heirListPanel, BoxLayout.Y_AXIS));
@@ -832,8 +880,7 @@ public class MemberRecordForm extends JFrame {
     }
 
     // =========================================================================
-    // MEMBERSHIP CATEGORY FILTER — cascades from Membership Type
-    // (ported from the Membership Information module)
+    // MEMBERSHIP CATEGORY FILTER
     // =========================================================================
     private void filterMembershipCategoryOptions(String membershipType) {
         String[] options;
@@ -856,7 +903,7 @@ public class MemberRecordForm extends JFrame {
                 options = new String[]{"Select"};
                 disableForOthers = true;
                 break;
-            default: // "Select" — no Membership Type chosen yet
+            default:
                 options = new String[]{"Select"};
                 disableForOthers = true;
         }
@@ -884,18 +931,14 @@ public class MemberRecordForm extends JFrame {
             membershipCategoryOtherEarningPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 0));
         }
 
-        // Membership Category drives the Current Employment OFW gate — re-check it
-        // every time the category list (and therefore the selection) changes.
         applyOfwGate();
     }
 
     // =========================================================================
-    // CURRENT EMPLOYMENT — COUNTRY OF ASSIGNMENT / TYPE OF WORK OFW GATE
-    // (ported from the Current Employment module; driven by Membership Category
-    // on this same form instead of the registration session)
+    // OFW GATE
     // =========================================================================
     private void applyOfwGate() {
-        if (curCountryBox == null || curTypeOfWorkBox == null) return; // not built yet
+        if (curCountryBox == null || curTypeOfWorkBox == null) return;
 
         boolean isOfw = "Overseas Filipino Worker".equals(membershipCategoryBox.getSelectedItem());
         String tip = "Available only for OFW members. Set Membership Category to "
@@ -910,16 +953,12 @@ public class MemberRecordForm extends JFrame {
                 curCountryOthersPanel.setVisible(false);
                 curCountryOthersField.setText("");
             }
-
             curTypeOfWorkBox.setSelectedItem("Select");
             curTypeOfWorkBox.setEnabled(false);
             curTypeOfWorkBox.setToolTipText(tip);
         } else {
-            // OFW members are, by definition, assigned outside the Philippines —
-            // remove it from the choices instead of just locking the field.
             String previouslySelected = (String) curCountryBox.getSelectedItem();
             curCountryBox.setModel(new javax.swing.DefaultComboBoxModel<>(COUNTRY_OPTIONS_OFW));
-
             boolean restored = false;
             if (previouslySelected != null) {
                 for (int i = 0; i < curCountryBox.getItemCount(); i++) {
@@ -930,8 +969,7 @@ public class MemberRecordForm extends JFrame {
                     }
                 }
             }
-            if (!restored) curCountryBox.setSelectedIndex(0); // "Select"
-
+            if (!restored) curCountryBox.setSelectedIndex(0);
             curCountryBox.setEnabled(true);
             curCountryBox.setToolTipText(null);
             curTypeOfWorkBox.setEnabled(true);
@@ -939,7 +977,9 @@ public class MemberRecordForm extends JFrame {
         }
     }
 
-    // ── Dynamic prev emp entry ────────────────────────────────────────────────
+    // =========================================================================
+    // DYNAMIC ENTRIES
+    // =========================================================================
     private void addPrevEmp(String company, String from, String to) {
         prevEmpCount++;
         PrevEmpEntry entry = new PrevEmpEntry(company, from, to);
@@ -973,13 +1013,11 @@ public class MemberRecordForm extends JFrame {
         prevEmpListPanel.revalidate(); prevEmpListPanel.repaint();
     }
 
-    // ── Dynamic heir entry ────────────────────────────────────────────────────
     private void addHeir(String name, String rel, String bdate) {
         heirCount++;
         HeirEntryPanel entry = new HeirEntryPanel(name, rel, bdate);
         heirEntries.add(entry);
 
-        // Extra height to fit the "Relationship — please specify" row when shown.
         JPanel sub = buildSubCard(accentRed, 300);
         JPanel subHdr = new JPanel(new BorderLayout()); subHdr.setOpaque(false);
         JLabel subLbl = new JLabel("Heir / Dependent " + heirCount);
@@ -1003,7 +1041,6 @@ public class MemberRecordForm extends JFrame {
         r2.add(lf("BIRTHDATE (YYYY-MM-DD)", entry.birthdateField));
         sub.add(r2); sub.add(vgap(10));
 
-        // "Other" relationship specify field — hidden unless "Other" is selected
         sub.add(entry.relationshipOthersPanel);
 
         heirListPanel.add(sub);
@@ -1011,7 +1048,9 @@ public class MemberRecordForm extends JFrame {
         heirListPanel.revalidate(); heirListPanel.repaint();
     }
 
-    // ── Entry data holders ────────────────────────────────────────────────────
+    // =========================================================================
+    // ENTRY DATA HOLDERS
+    // =========================================================================
     private class PrevEmpEntry {
         JComboBox<String> companyBox;
         JTextField fromField, toField;
@@ -1025,13 +1064,9 @@ public class MemberRecordForm extends JFrame {
                     companyBox.setSelectedIndex(i); break;
                 }
             }
-            fromField = tfDate();
-            fromField.setText(from);
-            toField   = tfDate();
-            toField.setText(to);
-            // ── From date: must be in the past ────────────────────────────────
+            fromField = tfDate(); fromField.setText(from);
+            toField   = tfDate(); toField.setText(to);
             attachDateValidation(fromField, true,  "From Date");
-            // ── To date: future allowed (still employed there is possible) ────
             attachDateValidation(toField,   false, "To Date");
         }
     }
@@ -1045,12 +1080,10 @@ public class MemberRecordForm extends JFrame {
             nameField      = tf(name);
             birthdateField = tfDate();
             birthdateField.setText(bdate);
-            // ── Heir birthdate: must not be in the future ─────────────────────
             attachDateValidation(birthdateField, true, "Heir Birthdate");
             relationshipBox = cb(new String[]{
                 "Select","Spouse","Child","Parent","Sibling","Legal Heir","Other"});
 
-            // "Other" relationship — free-text specify field (hidden by default)
             relationshipOthersField = tf("");
             relationshipOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
             relationshipOthersPanel.setOpaque(false);
@@ -1063,13 +1096,10 @@ public class MemberRecordForm extends JFrame {
             if (rel != null && !rel.isEmpty()) {
                 for (int i = 0; i < relationshipBox.getItemCount(); i++) {
                     if (relationshipBox.getItemAt(i).equalsIgnoreCase(rel)) {
-                        relationshipBox.setSelectedIndex(i);
-                        matched = true;
-                        break;
+                        relationshipBox.setSelectedIndex(i); matched = true; break;
                     }
                 }
                 if (!matched) {
-                    // Free-text relationship value coming from the database
                     relationshipBox.setSelectedItem("Other");
                     relationshipOthersField.setText(rel);
                     relationshipOthersPanel.setVisible(true);
@@ -1087,7 +1117,7 @@ public class MemberRecordForm extends JFrame {
     }
 
     // =========================================================================
-    // REVERSE DB MAPPERS — used when loading saved data back into the combos
+    // REVERSE DB MAPPERS
     // =========================================================================
     private String fromDbMembershipType(String db) {
         if (db == null) return "Select";
@@ -1095,7 +1125,7 @@ public class MemberRecordForm extends JFrame {
             case "EMPLOYED":                 return "Employed";
             case "OVERSEAS FILIPINO WORKER": return "Overseas Filipino Worker";
             case "SELF-EMPLOYED":            return "Self-Employed";
-            default:                         return "Others"; // free-text value
+            default:                         return "Others";
         }
     }
 
@@ -1109,7 +1139,7 @@ public class MemberRecordForm extends JFrame {
             case "PROFESSIONAL/BUSINESS OWNER": return "Professional/Business Owner";
             case "JOB ORDER PERSONNEL":         return "Job Order Personnel";
             case "OTHER EARNING GROUPS":        return "Other Earning Groups";
-            default:                            return "Other Earning Groups"; // free-text
+            default:                            return "Other Earning Groups";
         }
     }
 
@@ -1154,18 +1184,12 @@ public class MemberRecordForm extends JFrame {
     private void setCombo(JComboBox<String> box, String value) {
         if (value == null || value.isEmpty()) return;
         for (int i = 0; i < box.getItemCount(); i++) {
-            if (box.getItemAt(i).equalsIgnoreCase(value)) {
-                box.setSelectedIndex(i);
-                return;
-            }
+            if (box.getItemAt(i).equalsIgnoreCase(value)) { box.setSelectedIndex(i); return; }
         }
         String norm = value.replace(" ", "").replace("_", "").toLowerCase();
         for (int i = 0; i < box.getItemCount(); i++) {
             String item = box.getItemAt(i).replace(" ", "").replace("_", "").toLowerCase();
-            if (item.equals(norm)) {
-                box.setSelectedIndex(i);
-                return;
-            }
+            if (item.equals(norm)) { box.setSelectedIndex(i); return; }
         }
     }
 
@@ -1240,7 +1264,6 @@ public class MemberRecordForm extends JFrame {
         p.add(l, BorderLayout.NORTH); p.add(field, BorderLayout.CENTER); return p;
     }
 
-    // ── tfDate() — restricts input to YYYY-MM-DD, auto-inserts dashes ────────
     private JTextField tfDate() {
         JTextField field = tf("");
         field.setToolTipText("Format: YYYY-MM-DD");
@@ -1252,25 +1275,18 @@ public class MemberRecordForm extends JFrame {
                                     javax.swing.text.AttributeSet attrs)
                         throws javax.swing.text.BadLocationException {
                     if (text == null) text = "";
-
                     String current = fb.getDocument().getText(0, fb.getDocument().getLength());
                     StringBuilder sb = new StringBuilder(current);
                     sb.replace(offset, offset + length, text);
-                    String raw = sb.toString();
-
-                    String digits = raw.replaceAll("[^0-9]", "");
-                    if (digits.length() > 8) return; // max 8 digits (YYYYMMDD)
-
-                    // Re-format with dashes: YYYY-MM-DD
+                    String digits = sb.toString().replaceAll("[^0-9]", "");
+                    if (digits.length() > 8) return;
                     StringBuilder formatted = new StringBuilder();
                     for (int i = 0; i < digits.length(); i++) {
                         if (i == 4 || i == 6) formatted.append("-");
                         formatted.append(digits.charAt(i));
                     }
-
                     fb.replace(0, fb.getDocument().getLength(), formatted.toString(), attrs);
                 }
-
                 @Override
                 public void remove(FilterBypass fb, int offset, int length)
                         throws javax.swing.text.BadLocationException {
@@ -1278,10 +1294,8 @@ public class MemberRecordForm extends JFrame {
                 }
             });
 
-        // Space or Enter triggers pad + format
         field.addKeyListener(new java.awt.event.KeyAdapter() {
-            @Override
-            public void keyPressed(java.awt.event.KeyEvent e) {
+            @Override public void keyPressed(java.awt.event.KeyEvent e) {
                 if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
                         || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
                     e.consume();
@@ -1293,31 +1307,21 @@ public class MemberRecordForm extends JFrame {
         return field;
     }
 
-    // ── Pads single-digit month/day with a leading zero, then re-formats ──────
     private void applyDatePadAndFormat(JTextField f) {
         String raw = f.getText().replaceAll("[^0-9]", "");
         if (raw.isEmpty()) return;
-
         String year = raw.length() >= 4 ? raw.substring(0, 4) : raw;
         String rest = raw.length() >  4 ? raw.substring(4)    : "";
-
-        if (rest.length() == 1) {
-            rest = "0" + rest;
-        } else if (rest.length() == 3) {
-            if (rest.charAt(0) == '0') {
-                rest = rest.substring(0, 2) + "0" + rest.substring(2);
-            } else {
-                rest = "0" + rest;
-            }
+        if (rest.length() == 1) rest = "0" + rest;
+        else if (rest.length() == 3) {
+            rest = (rest.charAt(0) == '0') ? rest.substring(0,2)+"0"+rest.substring(2) : "0"+rest;
         }
-
         String padded = year + rest;
         StringBuilder formatted = new StringBuilder();
         for (int i = 0; i < padded.length(); i++) {
             if (i == 4 || i == 6) formatted.append("-");
             formatted.append(padded.charAt(i));
         }
-
         if (!formatted.toString().equals(f.getText())) {
             f.setText(formatted.toString());
             f.setCaretPosition(formatted.length());

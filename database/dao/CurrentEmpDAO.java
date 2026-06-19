@@ -9,6 +9,9 @@ import database.DatabaseConnection;
 import models.CurrentEmpRecordTable;
 
 public class CurrentEmpDAO {
+    public void deleteCurrentEmpByMID(String mid) {
+    deleteByMID(mid);
+}
 	
     // ─── INSERT ───────────────────────────────────────────────────────────────
     public boolean insertCurrentEmp(CurrentEmpRecordTable record) {
