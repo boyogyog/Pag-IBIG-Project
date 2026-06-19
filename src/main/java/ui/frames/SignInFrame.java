@@ -83,6 +83,7 @@ public class SignInFrame extends JFrame {
                     JOptionPane.WARNING_MESSAGE
             );
             if (choice == JOptionPane.YES_OPTION) {
+                main.RegistrationSession.reset();
                 new LoginFrame();
                 dispose();
             }

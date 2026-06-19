@@ -33,10 +33,26 @@ public class SignUpFrame extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        RegistrationSession session = RegistrationSession.getInstance();
+        RegistrationSession sessionRef = RegistrationSession.getInstance();
+        MemberDAO memberDAO = new MemberDAO();
 
-        if (session.getTempMID() == null || session.getTempMID().isEmpty()) {
-            MemberDAO memberDAO = new MemberDAO();
+        boolean needFreshMID = (sessionRef.getTempMID() == null || sessionRef.getTempMID().isEmpty());
+
+        // Verify the cached MID still exists in the DB. If it was deleted
+        // (e.g. by an admin) treat the cached session as stale and start fresh.
+        // This also clears stale completion flags, which resets the
+        // "ongoing" progress bar and module DONE/PENDING statuses.
+        if (!needFreshMID && memberDAO.getMemberById(sessionRef.getTempMID()) == null) {
+            RegistrationSession.reset();
+            sessionRef = RegistrationSession.getInstance();
+            needFreshMID = true;
+        }
+
+        // Captured by inner classes/lambdas below (progressTrack's paintComponent,
+        // button listeners), so it must be final/effectively final from here on.
+        final RegistrationSession session = sessionRef;
+
+        if (needFreshMID) {
             String generatedMID = memberDAO.generateNextMID();
             if (generatedMID == null) {
                 JOptionPane.showMessageDialog(null,
@@ -235,7 +251,7 @@ public class SignUpFrame extends JFrame {
         DarkModuleCard btnHeirs = new DarkModuleCard(
                 "HEIRS INFORMATION",
                 "OPTIONAL",
-                "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67", tealAcc, heirsIcon, 380, 30, 200, 150);
+                "\uD83D\uDC6A", tealAcc, heirsIcon, 380, 30, 200, 150);
 
         DarkModuleCard btnCurrentEmp = new DarkModuleCard(
                 "CURRENT EMPLOYMENT INFORMATION",

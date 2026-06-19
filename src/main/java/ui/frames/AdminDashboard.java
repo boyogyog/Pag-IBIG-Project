@@ -421,6 +421,12 @@ public class AdminDashboard extends JFrame {
             if (new MemberDAO().deleteMember(mid)) {
                 showInfo("Member deleted.");
                 loadMembers(memberSearch.getText().trim());
+
+                // ── ADDED: invalidate stale signup session if it pointed at this MID ──
+                main.RegistrationSession session = main.RegistrationSession.getInstance();
+                if (mid.equals(session.getTempMID())) {
+                    main.RegistrationSession.reset();
+                }
             } else showError("Delete failed.");
         }
     }
