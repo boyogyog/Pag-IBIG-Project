@@ -19,3 +19,4 @@ database/database/DatabaseConnection.java
 # Environment/secrets
 *.env
 application.properties
+/bin/
