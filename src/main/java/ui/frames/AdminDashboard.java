@@ -54,15 +54,15 @@ import models.PrevEmpTable;
 
 public class AdminDashboard extends JFrame {
 
-    private final Color darkBg1     = new Color(13, 27, 52);
-    private final Color darkBg2     = new Color(17, 53, 100);
-    private final Color accentGreen = new Color(72, 199, 161);
-    private final Color accentAmber = new Color(245, 176, 50);
-    private final Color accentRed   = new Color(235, 87, 107);
-    private final Color accentBlue  = new Color(82, 158, 255);
-    private final Color tableBg     = new Color(16, 33, 64);
-    private final Color tableHeader = new Color(12, 45, 85);
-    private final Color tableAlt    = new Color(20, 42, 78);
+	private final Color darkBg1     = new Color(8, 15, 35);
+	private final Color darkBg2     = new Color(12, 25, 58);
+	private final Color accentGreen = new Color(0, 212, 170);
+	private final Color accentAmber = new Color(230, 160, 30);
+	private final Color accentRed   = new Color(220, 60, 85);
+	private final Color accentBlue  = new Color(88, 130, 240);
+	private final Color tableBg     = new Color(11, 20, 46);
+	private final Color tableHeader = new Color(8, 16, 38);
+	private final Color tableAlt    = new Color(15, 27, 58);
 
     private final String adminName;
 
@@ -94,9 +94,21 @@ public class AdminDashboard extends JFrame {
         JPanel bg = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setPaint(new GradientPaint(0, 0, darkBg1, getWidth(), getHeight(), darkBg2));
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // Deep navy base
+                g2.setColor(darkBg1);
                 g2.fillRect(0, 0, getWidth(), getHeight());
+                // Subtle radial glow top-left
+                java.awt.RadialGradientPaint glow = new java.awt.RadialGradientPaint(
+                    new java.awt.geom.Point2D.Float(getWidth() * 0.15f, getHeight() * 0.1f),
+                    getWidth() * 0.5f,
+                    new float[]{0f, 1f},
+                    new Color[]{new Color(0, 80, 160, 60), new Color(0, 0, 0, 0)}
+                );
+                g2.setPaint(glow);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
             }
         };
         setContentPane(bg);
@@ -110,30 +122,51 @@ public class AdminDashboard extends JFrame {
         JPanel bar = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setColor(new Color(0, 0, 0, 80));
+                g2.setColor(new Color(6, 12, 30));
                 g2.fillRect(0, 0, getWidth(), getHeight());
-                g2.setColor(accentGreen);
+                // Bottom accent line gradient
+                GradientPaint lineGrad = new GradientPaint(
+                    0, 0, new Color(0, 212, 170, 0),
+                    getWidth() / 2f, 0, new Color(0, 212, 170, 255)
+                );
+                // Extend to right side fading out
+                g2.setPaint(new GradientPaint(0, getHeight()-2, new Color(0,212,170,0),
+                    getWidth()*0.6f, getHeight()-2, new Color(0,212,170,200)));
                 g2.fillRect(0, getHeight() - 2, getWidth(), 2);
                 g2.dispose();
             }
         };
         bar.setOpaque(false);
-        bar.setBorder(new EmptyBorder(16, 28, 16, 28));
+        bar.setBorder(new EmptyBorder(18, 32, 18, 32));
 
         JPanel left = new JPanel();
         left.setOpaque(false);
         left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
 
-        JLabel badge = new JLabel("Admin Management Portal");
+        // Pill badge
+        JLabel badge = new JLabel("  Admin Management Portal  ") {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(0, 212, 170, 20));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                g2.setColor(new Color(0, 212, 170, 100));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, getHeight(), getHeight());
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
         badge.setFont(new Font("Arial", Font.BOLD, 11));
-        badge.setForeground(new Color(130, 190, 255));
+        badge.setForeground(new Color(0, 212, 170));
+        badge.setOpaque(false);
+        badge.setBorder(new EmptyBorder(3, 0, 3, 0));
 
         JLabel welcome = new JLabel("Welcome, " + adminName);
-        welcome.setFont(new Font("Arial Black", Font.BOLD, 20));
-        welcome.setForeground(accentGreen);
+        welcome.setFont(new Font("Arial Black", Font.BOLD, 22));
+        welcome.setForeground(Color.WHITE);
 
         left.add(badge);
-        left.add(Box.createRigidArea(new Dimension(0, 4)));
+        left.add(Box.createRigidArea(new Dimension(0, 6)));
         left.add(welcome);
 
         JButton logoutBtn = navButton("Logout");
@@ -151,15 +184,46 @@ public class AdminDashboard extends JFrame {
     // ── Tabs ──────────────────────────────────────────────────────────────────
     private JTabbedPane buildTabs() {
         JTabbedPane tabs = new JTabbedPane();
-        tabs.setFont(new Font("Arial Black", Font.BOLD, 13));
-        tabs.setBackground(new Color(13, 27, 52));
-        tabs.setForeground(Color.WHITE);
-        tabs.setOpaque(false);
-        tabs.addTab("  Members",              buildMembersTab());
-        tabs.addTab("  Current Employment",   buildEmploymentTab());
-        tabs.addTab("  Previous Employment",  buildPreviousEmploymentTab());
-        tabs.addTab("  Heirs",                buildHeirsTab());
-        tabs.addTab("  Companies",            buildCompaniesTab());
+        tabs.setFont(new Font("Arial", Font.BOLD, 13));
+        tabs.setBackground(new Color(6, 11, 28));
+        tabs.setForeground(new Color(120, 150, 200));
+        tabs.setOpaque(true);
+        tabs.addTab("  Members",             buildMembersTab());
+        tabs.addTab("  Current Employment",  buildEmploymentTab());
+        tabs.addTab("  Previous Employment", buildPreviousEmploymentTab());
+        tabs.addTab("  Heirs",               buildHeirsTab());
+        tabs.addTab("  Companies",           buildCompaniesTab());
+
+        tabs.setUI(new javax.swing.plaf.basic.BasicTabbedPaneUI() {
+            @Override protected void installDefaults() {
+                super.installDefaults();
+                highlight        = new Color(8, 15, 35);
+                lightHighlight   = new Color(8, 15, 35);
+                shadow           = new Color(8, 15, 35);
+                darkShadow       = new Color(8, 15, 35);
+                focus            = new Color(8, 15, 35);
+            }
+            @Override protected void paintTabBackground(Graphics g, int tabPlacement,
+                    int tabIndex, int x, int y, int w, int h, boolean isSelected) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (isSelected) {
+                    g2.setColor(new Color(0, 212, 170, 25));
+                    g2.fillRoundRect(x+1, y+1, w-2, h+4, 8, 8);
+                    g2.setColor(new Color(0, 212, 170));
+                    g2.fillRect(x+4, y+h-2, w-8, 2);
+                } else {
+                    g2.setColor(new Color(255, 255, 255, 5));
+                    g2.fillRoundRect(x+1, y+1, w-2, h, 8, 8);
+                }
+                g2.dispose();
+            }
+            @Override protected void paintTabBorder(Graphics g, int tabPlacement,
+                    int tabIndex, int x, int y, int w, int h, boolean isSelected) {}
+            @Override protected void paintContentBorder(Graphics g, int tabPlacement, int selectedIndex) {
+                // No border
+            }
+        });
         return tabs;
     }
 
@@ -989,9 +1053,9 @@ public class AdminDashboard extends JFrame {
     }
 
     private JLabel dlgSectionLabel(String text) {
-        JLabel l = new JLabel(text);
-        l.setFont(new Font("Arial Black", Font.BOLD, 13));
-        l.setForeground(new Color(130, 190, 255));
+        JLabel l = new JLabel(text.toUpperCase());
+        l.setFont(new Font("Arial Black", Font.BOLD, 12));
+        l.setForeground(new Color(32, 201, 190));
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         l.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(72, 199, 161, 80)),
@@ -1008,10 +1072,10 @@ public class AdminDashboard extends JFrame {
     }
 
     private JLabel sectionLabel(String text) {
-        JLabel l = new JLabel(text);
-        l.setFont(new Font("Arial Black", Font.BOLD, 18));
-        l.setForeground(accentGreen);
-        l.setBorder(new EmptyBorder(0, 0, 8, 0));
+        JLabel l = new JLabel(text.toUpperCase());
+        l.setFont(new Font("Arial Black", Font.BOLD, 15));
+        l.setForeground(new Color(0, 212, 170));
+        l.setBorder(new EmptyBorder(0, 0, 10, 0));
         return l;
     }
 
@@ -1019,18 +1083,18 @@ public class AdminDashboard extends JFrame {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         row.setOpaque(false);
 
-        JTextField search = new JTextField(25);
-        search.setBackground(new Color(12, 28, 55));
+        JTextField search = new JTextField(28);
+        search.setBackground(new Color(8, 16, 38));
         search.setForeground(Color.WHITE);
-        search.setCaretColor(accentGreen);
+        search.setCaretColor(new Color(0, 212, 170));
         search.setFont(new Font("Arial", Font.PLAIN, 13));
         search.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(72, 199, 161, 120), 1, true),
-            new EmptyBorder(8, 14, 8, 14)
+            BorderFactory.createLineBorder(new Color(0, 212, 170, 70), 1, true),
+            new EmptyBorder(9, 14, 9, 14)
         ));
 
-        JButton searchBtn  = smallBtn("Search", new Color(33, 97, 196));
-        JButton refreshBtn = smallBtn("Reset",  new Color(55, 65, 90));
+        JButton searchBtn  = smallBtn("Search", new Color(25, 95, 200));
+        JButton refreshBtn = smallBtn("Reset",  new Color(45, 55, 90));
 
         row.add(search);
         row.add(searchBtn);
@@ -1051,13 +1115,21 @@ public class AdminDashboard extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getModel().isRollover() ? color.darker() : color);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                // Glow shadow
+                g2.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 60));
+                g2.fillRoundRect(2, 4, getWidth()-4, getHeight()-2, 12, 12);
+                // Main fill
+                GradientPaint gp = new GradientPaint(
+                    0, 0, getModel().isRollover() ? color.brighter() : color,
+                    0, getHeight(), color.darker()
+                );
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight()-4, 10, 10);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        btn.setPreferredSize(new Dimension(150, 40));
+        btn.setPreferredSize(new Dimension(150, 42));
         btn.setContentAreaFilled(false); btn.setBorderPainted(false);
         btn.setFocusPainted(false);      btn.setOpaque(false);
         btn.setForeground(Color.WHITE);
@@ -1072,8 +1144,15 @@ public class AdminDashboard extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getModel().isRollover() ? color.darker() : color);
+                GradientPaint gp = new GradientPaint(
+                    0, 0, getModel().isRollover() ? color.brighter() : color,
+                    0, getHeight(), color.darker()
+                );
+                g2.setPaint(gp);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                // Subtle top highlight
+                g2.setColor(new Color(255, 255, 255, 20));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight()/2, 8, 8);
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -1092,8 +1171,9 @@ public class AdminDashboard extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getModel().isRollover() ? new Color(235, 87, 107) : new Color(235, 87, 107, 200));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                Color c = getModel().isRollover() ? new Color(200, 45, 70) : new Color(220, 60, 85);
+                g2.setColor(c);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -1103,60 +1183,118 @@ public class AdminDashboard extends JFrame {
         btn.setContentAreaFilled(false); btn.setBorderPainted(false);
         btn.setFocusPainted(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(8, 18, 8, 18));
+        btn.setBorder(new EmptyBorder(10, 24, 10, 24));
         return btn;
+    }
+    
+    private JTextField dlgField(String value) {
+        JTextField f = new JTextField(value);
+        f.setBackground(new Color(8, 16, 38));
+        f.setForeground(Color.WHITE);
+        f.setCaretColor(new Color(0, 212, 170));
+        f.setFont(new Font("Arial", Font.PLAIN, 13));
+        f.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(0, 212, 170, 70), 1, true),
+            new EmptyBorder(8, 12, 8, 12)
+        ));
+        return f;
     }
 
     private JTable styledTable(DefaultTableModel model) {
         JTable table = new JTable(model);
-        table.setBackground(tableBg);
-        table.setForeground(Color.WHITE);
+        table.setBackground(new Color(11, 20, 46));
+        table.setForeground(new Color(200, 215, 245));
         table.setFont(new Font("Arial", Font.PLAIN, 13));
-        table.setRowHeight(34);
-        table.setGridColor(new Color(255, 255, 255, 15));
-        table.setSelectionBackground(new Color(72, 199, 161, 70));
+        table.setRowHeight(36);
+        table.setGridColor(new Color(255, 255, 255, 8));
+        table.setSelectionBackground(new Color(0, 212, 170, 50));
         table.setSelectionForeground(Color.WHITE);
         table.setShowVerticalLines(false);
-        table.setIntercellSpacing(new Dimension(0, 1));
-        table.getTableHeader().setBackground(tableHeader);
-        table.getTableHeader().setForeground(accentGreen);
-        table.getTableHeader().setFont(new Font("Arial Black", Font.BOLD, 12));
-        table.getTableHeader().setBorder(BorderFactory.createEmptyBorder());
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.getTableHeader().setBackground(new Color(6, 12, 30));
+        table.getTableHeader().setForeground(new Color(0, 212, 170));
+        table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 12));
+        table.getTableHeader().setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0,
+            new Color(0, 212, 170, 60)));
+        table.getTableHeader().setPreferredSize(new Dimension(0, 38));
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override public Component getTableCellRendererComponent(JTable t, Object val,
                     boolean sel, boolean foc, int row, int col) {
                 super.getTableCellRendererComponent(t, val, sel, foc, row, col);
-                setBackground(sel ? new Color(72, 199, 161, 70)
-                             : row % 2 == 0 ? tableBg : tableAlt);
-                setForeground(Color.WHITE);
-                setBorder(new EmptyBorder(0, 12, 0, 12));
+                if (sel) {
+                    setBackground(new Color(0, 212, 170, 45));
+                    setForeground(Color.WHITE);
+                } else if (row % 2 == 0) {
+                    setBackground(new Color(11, 20, 46));
+                    setForeground(new Color(185, 200, 230));
+                } else {
+                    setBackground(new Color(15, 27, 58));
+                    setForeground(new Color(165, 182, 215));
+                }
+                setBorder(new EmptyBorder(0, 14, 0, 14));
                 return this;
             }
         });
         table.setFillsViewportHeight(true);
+        table.addMouseMotionListener(new MouseAdapter() {
+            int lastRow = -1;
+            @Override public void mouseMoved(MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                if (row != lastRow) {
+                    lastRow = row;
+                    table.repaint();
+                }
+            }
+        });
+
+        final int[] hoveredRow = {-1};
+        table.addMouseMotionListener(new MouseAdapter() {
+            @Override public void mouseMoved(MouseEvent e) {
+                hoveredRow[0] = table.rowAtPoint(e.getPoint());
+                table.repaint();
+            }
+        });
+        table.addMouseListener(new MouseAdapter() {
+            @Override public void mouseExited(MouseEvent e) {
+                hoveredRow[0] = -1;
+                table.repaint();
+            }
+        });
+        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override public Component getTableCellRendererComponent(JTable t, Object val,
+                    boolean sel, boolean foc, int row, int col) {
+                super.getTableCellRendererComponent(t, val, sel, foc, row, col);
+                if (sel) {
+                    setBackground(new Color(0, 212, 170, 45));
+                    setForeground(Color.WHITE);
+                } else if (row == hoveredRow[0]) {
+                    setBackground(new Color(0, 212, 170, 18));
+                    setForeground(Color.WHITE);
+                } else if (row % 2 == 0) {
+                    setBackground(new Color(11, 20, 46));
+                    setForeground(new Color(185, 200, 230));
+                } else {
+                    setBackground(new Color(15, 27, 58));
+                    setForeground(new Color(165, 182, 215));
+                }
+                setBorder(new EmptyBorder(0, 14, 0, 14));
+                return this;
+            }
+        });
         return table;
     }
 
     private JScrollPane tableScroll(JTable table) {
         JScrollPane sp = new JScrollPane(table);
         sp.setOpaque(false);
-        sp.getViewport().setBackground(tableBg);
-        sp.setBorder(BorderFactory.createLineBorder(new Color(72, 199, 161, 60), 1));
-        sp.getVerticalScrollBar().setUnitIncrement(16);
-        return sp;
-    }
-
-    private JTextField dlgField(String value) {
-        JTextField f = new JTextField(value);
-        f.setBackground(new Color(20, 38, 70));
-        f.setForeground(Color.WHITE);
-        f.setCaretColor(accentGreen);
-        f.setFont(new Font("Arial", Font.PLAIN, 13));
-        f.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(72, 199, 161, 80), 1, true),
-            new EmptyBorder(8, 12, 8, 12)
+        sp.getViewport().setBackground(new Color(11, 20, 46));
+        sp.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(0, 212, 170, 40), 1),
+            BorderFactory.createEmptyBorder()
         ));
-        return f;
+        sp.getVerticalScrollBar().setUnitIncrement(16);
+        sp.getVerticalScrollBar().setBackground(new Color(8, 15, 35));
+        return sp;
     }
 
     private JButton dlgBtn(String text, Color color) {
