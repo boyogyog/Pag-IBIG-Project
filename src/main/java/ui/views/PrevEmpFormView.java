@@ -1,6 +1,6 @@
 package ui.views;
 
-import java.awt.BasicStroke;
+import java.awt.BasicStroke;	
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -42,6 +42,10 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.basic.BasicScrollBarUI;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 import dao.CompanyDAO;
 import dao.PrevEmpDAO;
@@ -188,14 +192,21 @@ public class PrevEmpFormView extends JPanel {
         });
 
         editSaveBtn.addActionListener(e -> {
-            if (!editMode) {
-                editMode = true;
-                editSaveBtn.setText("Save Changes");
-                unlockAllEntries();
-            } else {
-                handleSave();
+        if (!editMode) {
+            editMode = true;
+            editSaveBtn.setText("Save Changes");
+            // Remove the "No previous employment records found." placeholder, if present,
+            // so it doesn't linger above newly-added entries.
+            if (entries.isEmpty()) {
+                listPanel.removeAll();
+                listPanel.revalidate();
+                listPanel.repaint();
             }
-        });
+            unlockAllEntries();
+        } else {
+            handleSave();
+        }
+    });
 
         deleteBtn.addActionListener(e -> {
             int choice = JOptionPane.showConfirmDialog(PrevEmpFormView.this,
@@ -370,19 +381,17 @@ public class PrevEmpFormView extends JPanel {
             String from = entry.fromDateField.getText().trim();
             String to   = entry.toDateField.getText().trim();
             if (!from.isEmpty()) {
-                try { java.sql.Date.valueOf(from); }
-                catch (IllegalArgumentException ex) {
-                    JOptionPane.showMessageDialog(this,
-                        "From Date must be in YYYY-MM-DD format.",
+                String fromError = validateDate(from);
+                if (fromError != null) {
+                    JOptionPane.showMessageDialog(this, fromError,
                         "Validation Error", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
             }
             if (!to.isEmpty()) {
-                try { java.sql.Date.valueOf(to); }
-                catch (IllegalArgumentException ex) {
-                    JOptionPane.showMessageDialog(this,
-                        "To Date must be in YYYY-MM-DD format.",
+                String toError = validateDate(to);
+                if (toError != null) {
+                    JOptionPane.showMessageDialog(this, toError,
                         "Validation Error", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
@@ -412,8 +421,14 @@ public class PrevEmpFormView extends JPanel {
         lockAllEntries();
     }
 
-    // ── Load from DB ──────────────────────────────────────────────────────────
-    private void loadFromDatabase() {
+        // ── Load from DB ──────────────────────────────────────────────────────────
+        public void loadFromDatabase() {
+        // ── Clear existing state first so re-entering this view never stacks duplicate rows ──
+        entries.clear();
+        listPanel.removeAll();
+        listPanel.revalidate();
+        listPanel.repaint();
+
         if (loggedInMID == null || loggedInMID.isEmpty()) {
             addEntry(1, "No MID provided", "N/A", "N/A", "N/A", 0);
             return;
@@ -451,6 +466,8 @@ public class PrevEmpFormView extends JPanel {
         }
 
         lockAllEntries();
+        editMode = false;
+        editSaveBtn.setText("Edit");
     }
 
     private void addEntry(int number, String mid, String company,
@@ -546,9 +563,144 @@ public class PrevEmpFormView extends JPanel {
             r1.add(fieldPanel("COMPANY", companyBox));
 
             // Row 2: From / To dates
+         // Row 2: From / To dates
             JPanel r2 = row(2);
             r2.add(fieldPanel("FROM DATE (YYYY-MM-DD)", fromDateField = buildTextField(from)));
             r2.add(fieldPanel("TO DATE (YYYY-MM-DD)",   toDateField   = buildTextField(to)));
+
+            // ── DocumentFilter for fromDateField ──────────────────────────────
+            ((AbstractDocument) fromDateField.getDocument()).setDocumentFilter(new DocumentFilter() {
+                @Override
+                public void replace(FilterBypass fb, int offset, int length, String string, AttributeSet attr)
+                        throws BadLocationException {
+                    String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                    if (string.isEmpty() && length > 0) {
+                        if (offset > 0 && current.length() > offset - 1
+                                && current.charAt(offset - 1) == '-') {
+                            String withoutDash = current.substring(0, offset - 1)
+                                    + current.substring(offset + length - (length > 0 ? 0 : 0));
+                            fb.replace(0, current.length(),
+                                    withoutDash.substring(0, Math.max(0, offset - 1)), attr);
+                            return;
+                        }
+                        super.replace(fb, offset, length, string, attr);
+                        return;
+                    }
+                    if (!string.matches("\\d*")) return;
+                    String currentRaw = current.replace("-", "");
+                    String cursorRaw  = current.substring(0, offset).replace("-", "");
+                    String newRaw     = cursorRaw + string + currentRaw.substring(cursorRaw.length());
+                    if (newRaw.length() > 8) return;
+                    String formatted = formatDate(newRaw);
+                    fb.replace(0, current.length(), formatted, attr);
+                    int newCursor = cursorRaw.length() + string.length();
+                    if (newCursor >= 4) newCursor++;
+                    if (newCursor >= 7) newCursor++;
+                    final int pos = Math.min(newCursor, formatted.length());
+                    SwingUtilities.invokeLater(() -> fromDateField.setCaretPosition(pos));
+                }
+                @Override
+                public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                        throws BadLocationException { replace(fb, offset, 0, string, attr); }
+                private String formatDate(String digits) {
+                    if (digits.length() <= 4) return digits;
+                    if (digits.length() <= 6) return digits.substring(0, 4) + "-" + digits.substring(4);
+                    return digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6);
+                }
+            });
+            fromDateField.addKeyListener(new java.awt.event.KeyAdapter() {
+                @Override public void keyPressed(java.awt.event.KeyEvent e) {
+                    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
+                            || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                        e.consume();
+                        SwingUtilities.invokeLater(() -> applyDatePadAndFormat(fromDateField));
+                    }
+                }
+            });
+            fromDateField.addFocusListener(new FocusAdapter() {
+                @Override public void focusLost(FocusEvent e) {
+                    applyDatePadAndFormat(fromDateField);
+                    String text = fromDateField.getText().trim();
+                    if (text.isEmpty() || text.length() < 10) return;
+                    String error = validateDate(text);
+                    if (error != null) {
+                        JOptionPane.showMessageDialog(
+                                SwingUtilities.getWindowAncestor(fromDateField),
+                                error, "Validation Error", JOptionPane.WARNING_MESSAGE);
+                        SwingUtilities.invokeLater(() -> {
+                            setDateTextDirect(fromDateField, "");
+                            fromDateField.requestFocusInWindow();
+                        });
+                    }
+                }
+            });
+
+            // ── DocumentFilter for toDateField ────────────────────────────────
+            ((AbstractDocument) toDateField.getDocument()).setDocumentFilter(new DocumentFilter() {
+                @Override
+                public void replace(FilterBypass fb, int offset, int length, String string, AttributeSet attr)
+                        throws BadLocationException {
+                    String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                    if (string.isEmpty() && length > 0) {
+                        if (offset > 0 && current.length() > offset - 1
+                                && current.charAt(offset - 1) == '-') {
+                            String withoutDash = current.substring(0, offset - 1)
+                                    + current.substring(offset + length - (length > 0 ? 0 : 0));
+                            fb.replace(0, current.length(),
+                                    withoutDash.substring(0, Math.max(0, offset - 1)), attr);
+                            return;
+                        }
+                        super.replace(fb, offset, length, string, attr);
+                        return;
+                    }
+                    if (!string.matches("\\d*")) return;
+                    String currentRaw = current.replace("-", "");
+                    String cursorRaw  = current.substring(0, offset).replace("-", "");
+                    String newRaw     = cursorRaw + string + currentRaw.substring(cursorRaw.length());
+                    if (newRaw.length() > 8) return;
+                    String formatted = formatDate(newRaw);
+                    fb.replace(0, current.length(), formatted, attr);
+                    int newCursor = cursorRaw.length() + string.length();
+                    if (newCursor >= 4) newCursor++;
+                    if (newCursor >= 7) newCursor++;
+                    final int pos = Math.min(newCursor, formatted.length());
+                    SwingUtilities.invokeLater(() -> toDateField.setCaretPosition(pos));
+                }
+                @Override
+                public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                        throws BadLocationException { replace(fb, offset, 0, string, attr); }
+                private String formatDate(String digits) {
+                    if (digits.length() <= 4) return digits;
+                    if (digits.length() <= 6) return digits.substring(0, 4) + "-" + digits.substring(4);
+                    return digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6);
+                }
+            });
+            toDateField.addKeyListener(new java.awt.event.KeyAdapter() {
+                @Override public void keyPressed(java.awt.event.KeyEvent e) {
+                    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
+                            || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                        e.consume();
+                        SwingUtilities.invokeLater(() -> applyDatePadAndFormat(toDateField));
+                    }
+                }
+            });
+            toDateField.addFocusListener(new FocusAdapter() {
+                @Override public void focusLost(FocusEvent e) {
+                    applyDatePadAndFormat(toDateField);
+                    String text = toDateField.getText().trim();
+                    if (text.isEmpty() || text.length() < 10) return;
+                    String error = validateDate(text);
+                    if (error != null) {
+                        JOptionPane.showMessageDialog(
+                                SwingUtilities.getWindowAncestor(toDateField),
+                                error, "Validation Error", JOptionPane.WARNING_MESSAGE);
+                        SwingUtilities.invokeLater(() -> {
+                            setDateTextDirect(toDateField, "");
+                            toDateField.requestFocusInWindow();
+                        });
+                    }
+                }
+            });
 
             fields.add(r1);
             fields.add(Box.createRigidArea(new Dimension(0, 16)));
@@ -745,6 +897,102 @@ public class PrevEmpFormView extends JPanel {
         }
         return items;
     }
+    
+ // ── Auto-pad month/day with a leading zero if single-digit ───────────────
+    private void applyDatePadAndFormat(JTextField f) {
+        String raw = f.getText().replaceAll("[^0-9]", "");
+        if (raw.isEmpty()) return;
+
+        String year = raw.length() >= 4 ? raw.substring(0, 4) : raw;
+        String rest = raw.length() >  4 ? raw.substring(4)    : "";
+
+        if (rest.length() == 1) {
+            rest = "0" + rest;
+        } else if (rest.length() == 3) {
+            if (rest.charAt(0) == '0') {
+                rest = rest.substring(0, 2) + "0" + rest.substring(2);
+            } else {
+                rest = "0" + rest;
+            }
+        }
+
+        String padded = year + rest;
+        StringBuilder formatted = new StringBuilder();
+        for (int i = 0; i < padded.length(); i++) {
+            if (i == 4 || i == 6) formatted.append("-");
+            formatted.append(padded.charAt(i));
+        }
+
+        if (!formatted.toString().equals(f.getText())) {
+            AbstractDocument doc = (AbstractDocument) f.getDocument();
+            DocumentFilter filter = doc.getDocumentFilter();
+            doc.setDocumentFilter(null);
+            f.setText(formatted.toString());
+            doc.setDocumentFilter(filter);
+            int len = f.getDocument().getLength();
+            f.setCaretPosition(Math.min(formatted.length(), len));
+        }
+    }
+
+    // ── Full date validation ──────────────────────────────────────────────────
+    private String validateDate(String dateStr) {
+        if (dateStr == null || !dateStr.matches("\\d{4}-\\d{2}-\\d{2}"))
+            return "Date must be in YYYY-MM-DD format.";
+
+        int year, month, day;
+        try {
+            year  = Integer.parseInt(dateStr.substring(0, 4));
+            month = Integer.parseInt(dateStr.substring(5, 7));
+            day   = Integer.parseInt(dateStr.substring(8, 10));
+        } catch (NumberFormatException e) {
+            return "Date must be in YYYY-MM-DD format.";
+        }
+
+        int currentYear = java.time.LocalDate.now().getYear();
+
+        if (year < 1900 || year > currentYear)
+            return "Year must be between 1900 and " + currentYear + ".";
+
+        if (month < 1 || month > 12)
+            return "Month must be between 01 and 12.";
+
+        final int maxDays;
+        switch (month) {
+            case 1: case 3: case 5: case 7:
+            case 8: case 10: case 12: maxDays = 31; break;
+            case 4: case 6: case 9: case 11: maxDays = 30; break;
+            case 2:
+                boolean isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+                maxDays = isLeap ? 29 : 28; break;
+            default: return "Month must be between 01 and 12.";
+        }
+
+        if (day < 1 || day > maxDays)
+            return "Day must be between 01 and " + maxDays
+                   + (month == 2 ? " for " + year + " (February)." : " for the selected month.");
+
+        try {
+            java.time.LocalDate entered = java.time.LocalDate.of(year, month, day);
+            if (entered.isAfter(java.time.LocalDate.now()))
+                return "Date cannot be in the future.";
+        } catch (java.time.DateTimeException e) {
+            return "Invalid date. Please check the day, month, and year.";
+        }
+
+        return null;
+    }
+
+    // ── Set date text bypassing the document filter ───────────────────────────
+    private void setDateTextDirect(JTextField field, String value) {
+        AbstractDocument doc = (AbstractDocument) field.getDocument();
+        DocumentFilter existing = doc.getDocumentFilter();
+        try {
+            doc.setDocumentFilter(null);
+            field.setText(value);
+        } finally {
+            doc.setDocumentFilter(existing);
+        }
+    }
 
     private JTextField buildTextField(String value) {
         JTextField field = new JTextField(value) {
@@ -768,7 +1016,8 @@ public class PrevEmpFormView extends JPanel {
         field.setFont(new Font("Arial", Font.PLAIN, 14));
         field.setBorder(new EmptyBorder(10, 14, 10, 14));
         field.setEditable(false);
-        field.setFocusable(false);
+        field.setFocusable(true);   // explicit: field must stay focusable even while locked,
+                                    // otherwise setEditable(true) later won't restore typing
         field.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) { field.repaint(); }
             public void focusLost(FocusEvent e)   { field.repaint(); }

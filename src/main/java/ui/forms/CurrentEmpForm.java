@@ -2,9 +2,11 @@ package ui.forms;
 
 import dao.CurrentEmpDAO;
 import dao.CompanyDAO;
+import dao.MemberDAO;
 import main.RegistrationSession;
 import models.CurrentEmpRecordTable;
 import models.CompanyDetailsTable;
+import models.MemberTable;
 import ui.frames.SignUpFrame;
 
 import javax.swing.*;
@@ -28,6 +30,17 @@ public class CurrentEmpForm extends JPanel {
     private final Color accentAmber = new Color(251, 191, 36);
     private final Color accentRed   = new Color(255, 99, 132);
     private final Color textWhite   = Color.WHITE;
+
+
+    private static final String[] COUNTRY_OPTIONS_ALL = {
+            "Select", "Philippines", "Saudi Arabia", "United Arab Emirates",
+            "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
+    };
+    private static final String[] COUNTRY_OPTIONS_OFW = {
+            "Select", "Saudi Arabia", "United Arab Emirates",
+            "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
+    };
+    
 
     // ── Fields ────────────────────────────────────────────────────────────────
     public JTextField pagIbigMidNoField;
@@ -159,6 +172,7 @@ public class CurrentEmpForm extends JPanel {
         bg.add(card);
         add(bg, BorderLayout.CENTER);
         loadExistingRecord();
+        applyOfwGate();
     }
     
     // ── Auto-pad month/day with a leading zero if single-digit ───────────────
@@ -588,11 +602,7 @@ public class CurrentEmpForm extends JPanel {
         typeOfWorkBox.setForeground(Color.WHITE);
         typeOfWorkBox.setBackground(new Color(25, 35, 60));
         typeOfWorkBox.setForeground(Color.WHITE);
-        r2.add(fieldPanel("COUNTRY OF ASSIGNMENT *", countryOfAssignmentBox = buildComboBox(new String[]{
-                "Select", "Philippines", "Saudi Arabia", "United Arab Emirates",
-                "Qatar", "Kuwait", "Singapore", "Hong Kong",
-                "United States", "Canada", "Other"
-        })));
+        r2.add(fieldPanel("COUNTRY OF ASSIGNMENT *", countryOfAssignmentBox = buildComboBox(COUNTRY_OPTIONS_ALL)));
         c.add(r2); 
         // ── Disable TypeOfWork if Philippines ─────────────────────────────────
         countryOthersField = buildTextField();
@@ -714,6 +724,59 @@ public class CurrentEmpForm extends JPanel {
             field.setText(value);
         } finally {
             doc.setDocumentFilter(existing);
+        }
+    }
+
+
+
+    // ── OFW Gate — Type of Work & Country of Assignment only open for OFW members ──
+    private boolean isOfwMembershipCategory() {
+        MemberTable data = RegistrationSession.getInstance().getMemberData();
+        if (data == null) {
+            String mid = RegistrationSession.getInstance().getTempMID();
+            data = new MemberDAO().getMemberById(mid);
+        }
+        return data != null && "OVERSEAS FILIPINO WORKER".equalsIgnoreCase(data.getMembershipCategory());
+    }
+
+   private void applyOfwGate() {
+        boolean isOfw = isOfwMembershipCategory();
+        String tip = "Available only for OFW members. Set Membership Category to "
+                   + "\"Overseas Filipino Worker\" in Member Information to enable this.";
+
+        if (!isOfw) {
+            countryOfAssignmentBox.setSelectedItem("Philippines");
+            countryOfAssignmentBox.setEnabled(false);
+            countryOfAssignmentBox.setToolTipText(tip);
+            countryOthersPanel.setVisible(false);
+
+            typeOfWorkBox.setSelectedItem("Select");
+            typeOfWorkBox.setEnabled(false);
+            typeOfWorkBox.setToolTipText(tip);
+            for (Component comp : typeOfWorkBox.getComponents()) {
+                if (comp instanceof AbstractButton) comp.setVisible(false);
+            }
+        } else {
+            // OFW members are, by definition, assigned outside the Philippines —
+            // remove it from the choices instead of just locking the field.
+            String previouslySelected = (String) countryOfAssignmentBox.getSelectedItem();
+            countryOfAssignmentBox.setModel(new DefaultComboBoxModel<>(COUNTRY_OPTIONS_OFW));
+
+            boolean restored = false;
+            if (previouslySelected != null) {
+                for (int i = 0; i < countryOfAssignmentBox.getItemCount(); i++) {
+                    if (countryOfAssignmentBox.getItemAt(i).equals(previouslySelected)) {
+                        countryOfAssignmentBox.setSelectedIndex(i);
+                        restored = true;
+                        break;
+                    }
+                }
+            }
+            if (!restored) countryOfAssignmentBox.setSelectedIndex(0); // "Select"
+
+            countryOfAssignmentBox.setEnabled(true);
+            countryOfAssignmentBox.setToolTipText(null);
+            typeOfWorkBox.setToolTipText(null);
         }
     }
     

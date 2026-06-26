@@ -160,7 +160,9 @@ public class HeirsForm extends JPanel {
                }
            }
            // ── Save each entry to the database ───────────────────────────────
+          // ── Save each entry to the database ───────────────────────────────
            HeirsDAO dao = new HeirsDAO();
+           dao.deleteHeirsByMID(loggedInMid); // clear old records first to avoid duplicates on re-save
            int saved = 0;
            for (HeirEntry en : entries) {
                try {
@@ -187,6 +189,15 @@ public class HeirsForm extends JPanel {
                    return;
                }
            }
+           
+           if (saved < entries.size()) {
+               JOptionPane.showMessageDialog(this,
+                   "Only " + saved + " of " + entries.size() + " heir(s) were saved. "
+                   + "Check the console for [HeirsDAO] insertHeir error details.",
+                   "Save Incomplete", JOptionPane.ERROR_MESSAGE);
+               return; // don't proceed to the next screen if not everything saved
+           }
+
            isSaved = true;
 
            // ── Mark Heirs as done in the registration session ────────────────

@@ -6,7 +6,6 @@ import main.RegistrationSession;
 import models.CompanyDetailsTable;
 import models.PrevEmpTable;
 import ui.frames.SignUpFrame;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -146,7 +145,17 @@ public class PrevEmpForm extends JPanel {
         bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
-        addEntry(); // start with one blank entry
+     // Load existing records if any, else add blank entry
+        String mid = RegistrationSession.getInstance().getTempMID();
+        List<PrevEmpTable> existing = new PrevEmpDAO().getPrevEmpByMID(mid);
+
+        if (existing.isEmpty()) {
+            addEntry();
+        } else {
+            for (PrevEmpTable record : existing) {
+                addEntryWithData(record);
+            }
+        }
     }
 
     // ── Load Companies from DB ────────────────────────────────────────────────
@@ -270,16 +279,22 @@ public class PrevEmpForm extends JPanel {
             	}
             	companyCode = match.getCompanyCode();
 
-            	if (match == null) {
-            	    showError("Entry " + entryNum + ": Could not resolve company. Please re-select."); return;
-            	}
-            	companyCode = match.getCompanyCode();
             }
 
-            // ── Insert prev emp record ────────────────────────────────────────
-            PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
-            if (!dao.insertPrevEmp(record)) {
-                showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
+            // ── Insert or update prev emp record ──────────────────────────────
+            if (entry.prevEmpCode > 0) {
+                // Already exists in DB — update in place instead of re-inserting.
+                PrevEmpTable record = new PrevEmpTable(mid, entry.prevEmpCode, companyCode, toDate, fromDate);
+                if (!dao.updatePrevEmp(record)) {
+                    showError("Entry " + entryNum + ": Failed to update. Please try again."); return;
+                }
+            } else {
+                // Brand new entry — insert and capture the generated id so a second
+                // Save click on the same form (without reopening) won't re-insert it.
+                PrevEmpTable record = new PrevEmpTable(mid, 0, companyCode, toDate, fromDate);
+                if (!dao.insertPrevEmp(record)) {
+                    showError("Entry " + entryNum + ": Failed to save. Please try again."); return;
+                }
             }
         }
 
@@ -415,6 +430,43 @@ public class PrevEmpForm extends JPanel {
         listPanel.revalidate();
         listPanel.repaint();
     }
+    
+    public void addEntryWithData(PrevEmpTable record) {
+        empCount++;
+        PrevEmpEntry entry = new PrevEmpEntry(empCount, this);
+        entries.add(entry);
+        entry.prevEmpCode = record.getPrevEmpCode();
+
+        // Set company dropdown
+        for (int i = 0; i < companyDisplayItems.length; i++) {
+            CompanyDetailsTable c = i > 0 && i <= companyList.size() ? companyList.get(i - 1) : null;
+            if (c != null && c.getCompanyCode().equals(record.getCompanyCode())) {
+                entry.companyBox.setSelectedIndex(i);
+                break;
+            }
+        }
+
+        // Set dates
+        if (record.getFromDate() != null) {
+            AbstractDocument fromDoc = (AbstractDocument) entry.fromDateField.getDocument();
+            javax.swing.text.DocumentFilter f1 = fromDoc.getDocumentFilter();
+            fromDoc.setDocumentFilter(null);
+            entry.fromDateField.setText(record.getFromDate().toString());
+            fromDoc.setDocumentFilter(f1);
+        }
+        if (record.getToDate() != null) {
+            AbstractDocument toDoc = (AbstractDocument) entry.toDateField.getDocument();
+            javax.swing.text.DocumentFilter f2 = toDoc.getDocumentFilter();
+            toDoc.setDocumentFilter(null);
+            entry.toDateField.setText(record.getToDate().toString());
+            toDoc.setDocumentFilter(f2);
+        }
+
+        listPanel.add(entry);
+        listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
+        listPanel.revalidate();
+        listPanel.repaint();
+    }
 
     // ── Remove Entry ──────────────────────────────────────────────────────────
     public void removeEntry(PrevEmpEntry entry) {
@@ -445,6 +497,9 @@ public class PrevEmpForm extends JPanel {
         public JComboBox<String> companyBox;
         public JTextField fromDateField;
         public JTextField toDateField;
+
+        // 0 = new entry (not yet in DB). > 0 = existing DB row, loaded from getPrevEmpByMID().
+        public int prevEmpCode = 0;
 
         // New company fields (hidden by default)
         public JTextField        newCompanyNameField;

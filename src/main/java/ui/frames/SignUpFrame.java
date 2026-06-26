@@ -253,9 +253,9 @@ public class SignUpFrame extends JFrame {
                 "OPTIONAL",
                 "\uD83D\uDC6A", tealAcc, heirsIcon, 380, 30, 200, 150);
 
-        DarkModuleCard btnCurrentEmp = new DarkModuleCard(
+       DarkModuleCard btnCurrentEmp = new DarkModuleCard(
                 "CURRENT EMPLOYMENT INFORMATION",
-                session.isCurrentEmpDone() ? "DONE" : "PENDING",
+                "OPTIONAL",
                 "\uD83D\uDCBC", purpleAcc, currentEmpIcon, 390, 30, 220, 160);
 
         DarkModuleCard btnPrevEmp = new DarkModuleCard(
@@ -307,7 +307,8 @@ public class SignUpFrame extends JFrame {
         bg.add(gridPanel,  BorderLayout.CENTER);
 
         // ── Submit Application button (only when required modules done) ───────
-        boolean requiredDone = session.isMemberInfoDone() && session.isCurrentEmpDone();
+        boolean requiredDone = session.isMemberInfoDone();
+
         if (requiredDone) {
             JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 14));
             southPanel.setOpaque(false);

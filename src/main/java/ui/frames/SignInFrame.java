@@ -301,7 +301,7 @@ public class SignInFrame extends JFrame {
         Color[] amberAcc  = {new Color(251,191,36,60),  new Color(251,191,36,100),  new Color(251,191,36)};
 
         DarkModuleCard btnMember     = new DarkModuleCard("MEMBER INFORMATION",              "VIEW", "👤", blueAcc,   memberIcon,     370, 30, 260, 180);
-        DarkModuleCard btnHeirs      = new DarkModuleCard("HEIRS INFORMATION",               "VIEW", "👨‍👩‍👧", tealAcc,   heirsIcon,      380, 30, 200, 150);
+        DarkModuleCard btnHeirs      = new DarkModuleCard("HEIRS INFORMATION",               "VIEW", "\uD83D\uDC6A", tealAcc,   heirsIcon,      380, 30, 200, 150);
         DarkModuleCard btnCurrentEmp = new DarkModuleCard("CURRENT EMPLOYMENT INFORMATION",  "VIEW", "💼", purpleAcc, currentEmpIcon, 390, 30, 220, 160);
         DarkModuleCard btnPrevEmp    = new DarkModuleCard("PREVIOUS EMPLOYMENT INFORMATION", "VIEW", "📋", amberAcc,  prevEmpIcon,    390, 30, 220, 160);
 

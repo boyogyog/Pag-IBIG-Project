@@ -45,10 +45,12 @@ import dao.CompanyDAO;
 import dao.CurrentEmpDAO;
 import dao.HeirsDAO;
 import dao.MemberDAO;
+import dao.PrevEmpDAO;
 import models.CompanyDetailsTable;
 import models.CurrentEmpRecordTable;
 import models.HeirsTable;
 import models.MemberTable;
+import models.PrevEmpTable;
 
 public class AdminDashboard extends JFrame {
 
@@ -66,16 +68,19 @@ public class AdminDashboard extends JFrame {
 
     private DefaultTableModel memberModel;
     private DefaultTableModel empModel;
+    private DefaultTableModel prevEmpModel;
     private DefaultTableModel heirsModel;
     private DefaultTableModel companyModel;
 
     private JTable memberTable;
     private JTable empTable;
+    private JTable prevEmpTable;
     private JTable heirsTable;
     private JTable companyTable;
 
     private JTextField memberSearch;
     private JTextField empSearch;
+    private JTextField prevEmpSearch;
     private JTextField heirsSearch;
     private JTextField companySearch;
 
@@ -150,10 +155,11 @@ public class AdminDashboard extends JFrame {
         tabs.setBackground(new Color(13, 27, 52));
         tabs.setForeground(Color.WHITE);
         tabs.setOpaque(false);
-        tabs.addTab("  Members",    buildMembersTab());
-        tabs.addTab("  Employment", buildEmploymentTab());
-        tabs.addTab("  Heirs",      buildHeirsTab());
-        tabs.addTab("  Companies",  buildCompaniesTab());
+        tabs.addTab("  Members",              buildMembersTab());
+        tabs.addTab("  Current Employment",   buildEmploymentTab());
+        tabs.addTab("  Previous Employment",  buildPreviousEmploymentTab());
+        tabs.addTab("  Heirs",                buildHeirsTab());
+        tabs.addTab("  Companies",            buildCompaniesTab());
         return tabs;
     }
 
@@ -431,7 +437,7 @@ public class AdminDashboard extends JFrame {
         }
     }
 
-    // ── EMPLOYMENT TAB ───────────────────────────────────────────────────────
+    // ── CURRENT EMPLOYMENT TAB ───────────────────────────────────────────────
     private JPanel buildEmploymentTab() {
         JPanel panel = tabPanel();
 
@@ -561,6 +567,137 @@ public class AdminDashboard extends JFrame {
             if (new CurrentEmpDAO().deleteByMID(mid)) {
                 showInfo("Employment record deleted.");
                 loadEmployment(empSearch.getText().trim());
+            } else showError("Delete failed.");
+        }
+    }
+
+    // ── PREVIOUS EMPLOYMENT TAB ──────────────────────────────────────────────
+    private JPanel buildPreviousEmploymentTab() {
+        JPanel panel = tabPanel();
+
+        JPanel searchRow = searchRow();
+        prevEmpSearch = (JTextField) searchRow.getComponent(0);
+        JButton searchBtn  = (JButton) searchRow.getComponent(1);
+        JButton refreshBtn = (JButton) searchRow.getComponent(2);
+
+        String[] cols = {"Prev Emp Code", "MID No.", "Company Code", "From Date", "To Date"};
+        prevEmpModel = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        prevEmpTable = styledTable(prevEmpModel);
+
+        JPanel actions = actionRow(
+            actionBtn("Edit",   accentAmber, e -> editPrevEmployment()),
+            actionBtn("Delete", accentRed,   e -> deletePrevEmployment())
+        );
+
+        searchBtn.addActionListener(e -> loadPrevEmployment(prevEmpSearch.getText().trim()));
+        refreshBtn.addActionListener(e -> { prevEmpSearch.setText(""); loadPrevEmployment(""); });
+
+        panel.add(sectionLabel("Previous Employment Records"), BorderLayout.NORTH);
+        JPanel center = new JPanel(new BorderLayout(0, 10));
+        center.setOpaque(false);
+        center.add(searchRow,                 BorderLayout.NORTH);
+        center.add(tableScroll(prevEmpTable), BorderLayout.CENTER);
+        center.add(actions,                   BorderLayout.SOUTH);
+        panel.add(center, BorderLayout.CENTER);
+
+        loadPrevEmployment("");
+        return panel;
+    }
+
+    private void loadPrevEmployment(String filter) {
+        prevEmpModel.setRowCount(0);
+        PrevEmpDAO dao = new PrevEmpDAO();
+        List<PrevEmpTable> list = dao.getAllPrevEmp();
+        for (PrevEmpTable r : list) {
+            if (!filter.isEmpty() &&
+                !safe(r.getPagIbigMIDNo()).contains(filter) &&
+                !safe(r.getCompanyCode()).toLowerCase().contains(filter.toLowerCase())) continue;
+            prevEmpModel.addRow(new Object[]{
+                r.getPrevEmpCode(), r.getPagIbigMIDNo(), r.getCompanyCode(),
+                r.getFromDate(), r.getToDate()
+            });
+        }
+    }
+
+    private void editPrevEmployment() {
+        int row = prevEmpTable.getSelectedRow();
+        if (row < 0) { showInfo("Please select a record to edit."); return; }
+        int prevEmpCode = (int) prevEmpModel.getValueAt(row, 0);
+
+        PrevEmpDAO dao = new PrevEmpDAO();
+        PrevEmpTable r = dao.getPrevEmpByCode(prevEmpCode);
+        if (r == null) { showError("Record not found."); return; }
+
+        JDialog dlg = new JDialog(this, "Edit Previous Employment — Code " + prevEmpCode, true);
+        dlg.setSize(500, 320);
+        dlg.setLocationRelativeTo(this);
+        JPanel content = new JPanel(new GridBagLayout());
+        content.setBackground(new Color(15, 28, 55));
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.insets = new Insets(8, 12, 8, 12);
+
+        JTextField midF   = dlgField(safe(r.getPagIbigMIDNo()));
+        midF.setEditable(false);
+        midF.setForeground(new Color(130, 190, 255));
+        JTextField compF  = dlgField(safe(r.getCompanyCode()));
+        JTextField fromF  = dlgField(r.getFromDate() != null ? r.getFromDate().toString() : "");
+        JTextField toF    = dlgField(r.getToDate() != null ? r.getToDate().toString() : "");
+
+        String[] labels = {"MID No. (read-only)", "Company Code", "From Date (YYYY-MM-DD)", "To Date (YYYY-MM-DD)"};
+        JTextField[] tflds = {midF, compF, fromF, toF};
+        for (int i = 0; i < tflds.length; i++) {
+            gc.gridx = 0; gc.gridy = i; gc.weightx = 0.35;
+            JLabel l = new JLabel(labels[i]);
+            l.setForeground(accentGreen);
+            l.setFont(new Font("Arial", Font.BOLD, 11));
+            content.add(l, gc);
+            gc.gridx = 1; gc.weightx = 0.65;
+            content.add(tflds[i], gc);
+        }
+
+        JScrollPane sp = new JScrollPane(content);
+        sp.setBorder(null);
+        sp.getViewport().setBackground(new Color(15, 28, 55));
+        dlg.add(sp, BorderLayout.CENTER);
+
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        btnRow.setBackground(new Color(10, 22, 40));
+        JButton save   = dlgBtn("Save",   accentGreen);
+        JButton cancel = dlgBtn("Cancel", accentRed);
+        cancel.addActionListener(e -> dlg.dispose());
+        save.addActionListener(e -> {
+            try {
+                r.setCompanyCode(compF.getText().trim());
+                r.setFromDate(fromF.getText().trim().isEmpty() ? null : Date.valueOf(fromF.getText().trim()));
+                r.setToDate(toF.getText().trim().isEmpty() ? null : Date.valueOf(toF.getText().trim()));
+                if (dao.updatePrevEmp(r)) {
+                    showInfo("Previous employment record updated!");
+                    dlg.dispose();
+                    loadPrevEmployment(prevEmpSearch.getText().trim());
+                } else showError("Update failed.");
+            } catch (Exception ex) { showError("Invalid input: " + ex.getMessage()); }
+        });
+        btnRow.add(cancel); btnRow.add(save);
+        dlg.add(btnRow, BorderLayout.SOUTH);
+        dlg.setVisible(true);
+    }
+
+    private void deletePrevEmployment() {
+        int row = prevEmpTable.getSelectedRow();
+        if (row < 0) { showInfo("Please select a record to delete."); return; }
+        int prevEmpCode = (int) prevEmpModel.getValueAt(row, 0);
+        String mid = (String) prevEmpModel.getValueAt(row, 1);
+
+        int c = JOptionPane.showConfirmDialog(this,
+            "Delete previous employment record (Code " + prevEmpCode + ") for MID: " + mid + "?",
+            "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (c == JOptionPane.YES_OPTION) {
+            if (new PrevEmpDAO().deletePrevEmp(prevEmpCode)) {
+                showInfo("Previous employment record deleted.");
+                loadPrevEmployment(prevEmpSearch.getText().trim());
             } else showError("Delete failed.");
         }
     }
