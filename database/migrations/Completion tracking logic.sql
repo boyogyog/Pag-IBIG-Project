@@ -1,2 +1,0 @@
-ALTER TABLE membertcompanydetailstableable
-ADD COLUMN Application_Status VARCHAR(20) NOT NULL DEFAULT 'INCOMPLETE';
